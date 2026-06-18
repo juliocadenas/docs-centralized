@@ -1,0 +1,31 @@
+# AI Hub Madrid - Telegram Alert Bot Service
+# Install:
+#   sudo cp scripts/telegram-alert-bot.service /etc/systemd/system/
+#   sudo nano /etc/systemd/system/telegram-alert-bot.service  # set tokens
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now telegram-alert-bot
+
+[Unit]
+Description=AI Hub Madrid - Telegram Alert Bot
+After=network-online.target ai-hub-gateway.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pepe
+WorkingDirectory=/mnt/seagate/ai-hub-gateway
+ExecStart=/home/pepe/ai_env/bin/python /mnt/seagate/ai-hub-gateway/scripts/telegram_alert_bot.py
+Restart=on-failure
+RestartSec=30
+
+# Set your Telegram credentials here:
+Environment=TELEGRAM_BOT_TOKEN=YOUR_BOT_TOKEN_HERE
+Environment=TELEGRAM_CHAT_ID=YOUR_CHAT_ID_HERE
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=telegram-alert-bot
+
+[Install]
+WantedBy=multi-user.target

@@ -2,7 +2,7 @@
 
 > **⚠️ Este es el archivo maestro.** Cualquier agente de IA (Cline, Cursor, etc.) debe leer este archivo para entender la infraestructura completa. Se actualiza con cada cambio en la infraestructura.
 > 
-> **Última actualización:** 18 junio 2026 (v3.0 - NUCLEAR RECOVERY: VRAM watchdog + kernel panic guard + initramfs auto-fsck)
+> **Última actualización:** 18 junio 2026 (v3.1 - Telegram alert bot + Effects service fix + all pipelines verified)
 
 ---
 
@@ -335,6 +335,14 @@ El Gateway gestiona la VRAM inteligentemente con **auto-unload watchdog**:
 - vram-watchdog.service - Systemd VRAM watchdog
 
 **Prioridad:** Ollama (siempre) > servicio solicitado > resto
+
+**Telegram Alert Bot (NUEVO - 18 junio 2026):**
+- Monitorea el sistema cada 2 min
+- Alerta si Gateway cae, VRAM >85%, o servicios críticos offline
+- Notifica cuando el servidor se reinicia
+- Script: `scripts/telegram_alert_bot.py`
+- Setup: ver `scripts/TELEGRAM_BOT_SETUP.md`
+- Requiere: `TELEGRAM_BOT_TOKEN` y `TELEGRAM_CHAT_ID` (via @BotFather)
 
 ---
 
