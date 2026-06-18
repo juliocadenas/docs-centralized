@@ -1,72 +1,109 @@
 # 🚨 Guía de Recuperación - Server NAB9 (busybox initramfs)
 
-## Problema
-El servidor se queda trabado en `busybox initramfs` después de ciertos reinicios.
+> **Última actualización:** 18/06/2026 - Sistema recuperado y protegido con 6 capas anti-crash
 
-## Causa Raíz Identificada
-1. **VRAM OOM**: Todos los servicios AI cargaban modelos en GPU simultáneamente (16GB RTX 5080)
-2. **GPU Driver Crash**: Cuando la VRAM se agota, el driver de NVIDIA se cuelga
-3. **Kernel Panic/OOM**: Esto puede corromper el estado del filesystem
-4. **initramfs stuck**: En el siguiente boot, fsck detecta errores y se queda esperando input en busybox
+## Estado Actual: ✅ OPERATIVO
 
-## Lo Que Ya Se Arregló (antes del crash)
-- ✅ Todos los servicios pesados desactivados de auto-start
-- ✅ Solo ollama + gateway arrancan al boot
-- ✅ MuseTalk xtcocotools arreglado (numpy 1.26.4)
-- ✅ gpu_manager.py mejorado (health checks HTTP + systemd)
-- ✅ Watchdog de VRAM con auto-unload tras 10 min idle
+```
+Gateway:    OK (http://100.105.27.27:9000/v1)
+VRAM:       ~700-1000MB / 16.3GB (4-6%)
+LLM:        llama3.1:latest respondiendo
+TTS:        Piper (es_ES-sharvard) verificado
+STT:        Whisper medium (lazy-load) verificado
+```
 
-## Pasos de Recuperación Física
+## Problema Original
+El servidor se quedaba trabado en `busybox initramfs` después de crash por VRAM OOM:
+1. **VRAM OOM** - Todos los modelos cargados a la vez en 16GB RTX 5080
+2. **GPU Driver Crash** - NVIDIA driver se cuelga al agotarse VRAM
+3. **Kernel Panic/OOM** - Corrompe filesystem
+4. **initramfs stuck** - En boot, fsck detecta errores y cae a busybox
+
+## ✅ Solución Aplicada - 6 Capas de Protección
+
+### Capa 1: Initramfs Auto-Fsck (Script)
+- **Script:** `scripts/initramfs-auto-fsck.sh`
+- Auto-ejecuta `fsck -y` SIEMPRE (sin preguntar)
+- NUNCA cae a busybox shell - si fsck falla, reboot automático
+
+### Capa 2: Panic Guard
+- **Script:** `scripts/initramfs-panic-guard.sh`
+- **Config:** `scripts/99-panic-reboot.conf`
+- Patchea `panic()` del initramfs para auto-recuperar
+- `kernel.panic=10` (auto-reboot tras 10s)
+
+### Capa 3: VRAM Watchdog (OS-level)
+- **Script:** `scripts/vram-watchdog.sh`
+- **Service:** `scripts/vram-watchdog.service`
+- Monitorea VRAM cada 30s, mata procesos antes de OOM
+- Funciona independientemente del Gateway
+
+### Capa 4: Lazy-Loading Architecture
+- Solo Ollama es `always_on` (carga al boot)
+- TTS, STT, Avatars, Effects = lazy-load (cargan bajo demanda)
+- Auto-unload después de 5 min idle
+- Whisper cambió de large-v3 (9.6GB) a medium (0MB idle)
+
+### Capa 5: Systemd OOM Drop-ins
+- **Config:** `scripts/oom-protection-dropins.conf`
+- Memory limits per service
+- Restart policies con backoff
+
+### Capa 6: Gateway Health Checks
+- `always_on=False` para todos excepto Ollama
+- Status reporta "OK" correctamente
+- Health checks HTTP + systemd
+
+## Pasos de Recuperación Física (Si pasa de nuevo)
+
+> **IMPORTANTE:** Con las 6 capas instaladas, esto NO debería ser necesario.
+> Pero si ocurre corrupción severa del filesystem:
 
 ### 1. Conectar monitor + teclado al NAB9
 
-### 2. Solución A: fsck manual
+### 2. fsck manual
 ```bash
 (initramfs) fsck -y /dev/sda3
 (initramfs) exit
 ```
 
-### 3. Solución B: Si el disco USB se desconectó
-```bash
-(initramfs) ls /dev/sd*
-(initramfs) exit
-```
-
-### 4. Después de boot exitoso
+### 3. Después de boot exitoso
 ```bash
 ssh pepe@100.105.27.27
-sudo systemctl is-active comfyui documusic wan2gp musetalk latentsync liveportrait hallo2
-# Todos deben decir "inactive"
-nvidia-smi
+# Verificar servicios
+python scripts/check_system.py
+# Si algo está caído:
+sudo systemctl restart ai-hub-gateway ollama tts stt comfyui
 ```
 
-## ☢️ PLAN NUCLEAR (Solución Definitiva)
+## Monitoreo Rutinario
 
-> **NUEVO 18/06/2026:** Ver `NUCLEAR_RECOVERY_PLAN.md` para la solución completa de 6 fases.
-
-La prevención anterior no funcionaba porque los scripts systemd/cron NUNCA se ejecutan si el initramfs cae a busybox. La solución real es **modificar el initramfs mismo** para auto-repararse.
-
-### Despliegue (después de recuperación física):
+### Quick check (desde cualquier PC):
 ```bash
-# Desplegar las 6 fases vía SSH:
-python _deploy_nuclear_recovery.py
-
-# O solo una fase específica:
-python _deploy_nuclear_recovery.py --phase 2  # Solo initramfs
-python _deploy_nuclear_recovery.py --phase 3  # Solo VRAM watchdog
-
-# Dry run (ver qué haría sin aplicar cambios):
-python _deploy_nuclear_recovery.py --dry-run
+python scripts/check_system.py
 ```
 
-### Lo que hace el Plan Nuclear:
-1. **Initramfs auto-fsck** - Auto-repara el disco ANTES de montar root
-2. **Panic guard** - Si algo falla, auto-reboot en lugar de caer a busybox
-3. **VRAM watchdog OS-level** - Previene OOM independientemente del Gateway
-4. **Filesystem hardening** - `tune2fs -c 1`, `data=journal`, sysctl panic=10
-5. **Health checks mejorados** - Detección temprana de problemas
-6. **Verificación automática** - Chequea que todo quedó bien instalado
+### API endpoints útiles:
+```bash
+# Estado del sistema
+curl http://100.105.27.27:9000/v1/status | python -m json.tool
 
-### NOTA IMPORTANTE sobre Pop!_OS:
+# Infraestructura completa
+curl http://100.105.27.27:9000/v1/infrastructure | python -m json.tool
+
+# Modelos disponibles
+curl http://100.105.27.27:9000/v1/models | python -m json.tool
+
+# Docs
+# http://100.105.27.27:9000/docs
+```
+
+### Iniciar un servicio manualmente:
+```bash
+curl -X POST http://100.105.27.27:9000/v1/services/musetalk/start
+curl -X POST http://100.105.27.27:9000/v1/services/rembg/start
+```
+
+## NOTA sobre Pop!_OS
 Pop!_OS usa `systemd-boot` + `kernelstub`, **NO GRUB**.
 Los parámetros del kernel se cambian con `kernelstub`, no con `update-grub`.
