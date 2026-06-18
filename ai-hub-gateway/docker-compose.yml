@@ -1,0 +1,25 @@
+version: "3.8"
+
+services:
+  ai-hub-gateway:
+    build: .
+    container_name: ai-hub-gateway
+    ports:
+      - "9000:9000"
+    environment:
+      # Service URLs (use host.docker.internal to reach host services)
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - COMFYUI_BASE_URL=http://host.docker.internal:8188
+      - DOCUMUSIC_BASE_URL=http://host.docker.internal:7860
+      - WAN2GP_BASE_URL=http://host.docker.internal:7861
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    # GPU access for nvidia-smi monitoring
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]

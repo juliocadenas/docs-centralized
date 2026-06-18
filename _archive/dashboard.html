@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Hub Madrid</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a3e 50%, #0d0d2b 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+        .header {
+            text-align: center;
+            padding: 40px 20px 20px;
+            background: rgba(255,255,255,0.03);
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }
+        .header h1 {
+            font-size: 2.5em;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 8px;
+        }
+        .header p { color: #888; font-size: 1.1em; }
+        .badge {
+            display: inline-block;
+            background: #22c55e;
+            color: #000;
+            padding: 4px 14px;
+            border-radius: 20px;
+            font-size: 0.8em;
+            font-weight: 700;
+            margin-top: 12px;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+        .container { max-width: 1200px; margin: 0 auto; padding: 30px 20px; }
+        .section-title {
+            font-size: 1.4em;
+            color: #a78bfa;
+            margin: 30px 0 15px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .section-title::before {
+            content: '';
+            width: 4px;
+            height: 24px;
+            background: linear-gradient(180deg, #667eea, #764ba2);
+            border-radius: 2px;
+        }
+        .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+        .card {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 16px;
+            padding: 24px;
+            transition: all 0.3s ease;
+        }
+        .card:hover {
+            background: rgba(255,255,255,0.07);
+            border-color: rgba(255,255,255,0.15);
+            transform: translateY(-2px);
+        }
+        .card .icon { font-size: 2em; margin-bottom: 12px; }
+        .card h3 { color: #fff; margin-bottom: 6px; font-size: 1.15em; }
+        .card .status {
+            display: inline-block;
+            padding: 2px 10px;
+            border-radius: 12px;
+            font-size: 0.75em;
+            font-weight: 600;
+        }
+        .card .status.running { background: rgba(34,197,94,0.2); color: #22c55e; }
+        .card .status.offline { background: rgba(239,68,68,0.2); color: #ef4444; }
+        .card p { color: #888; font-size: 0.9em; margin-top: 8px; }
+        .card .port { color: #666; font-size: 0.8em; margin-top: 4px; }
+        .gpu-bar {
+            background: rgba(255,255,255,0.06);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 8px;
+        }
+        .gpu-bar .label { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 0.9em; }
+        .gpu-bar .bar {
+            height: 8px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .gpu-bar .bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            background: linear-gradient(90deg, #22c55e, #eab308, #ef4444);
+            transition: width 0.5s ease;
+        }
+        .endpoint-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .endpoint-table th {
+            text-align: left;
+            padding: 10px 14px;
+            background: rgba(255,255,255,0.03);
+            color: #a78bfa;
+            font-size: 0.85em;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .endpoint-table td {
+            padding: 10px 14px;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            font-size: 0.9em;
+        }
+        .endpoint-table code {
+            background: rgba(255,255,255,0.08);
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.85em;
+            color: #67e8f9;
+        }
+        .method {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75em;
+            font-weight: 700;
+        }
+        .method.get { background: rgba(34,197,94,0.2); color: #22c55e; }
+        .method.post { background: rgba(59,130,246,0.2); color: #3b82f6; }
+        .code-block {
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 10px;
+            overflow-x: auto;
+        }
+        .code-block pre {
+            color: #a5f3fc;
+            font-family: 'Cascadia Code', 'Fira Code', monospace;
+            font-size: 0.85em;
+            line-height: 1.6;
+        }
+        .code-block .comment { color: #666; }
+        .code-block .keyword { color: #c084fc; }
+        .code-block .string { color: #86efac; }
+        .tabs {
+            display: flex;
+            gap: 4px;
+            margin-top: 15px;
+            margin-bottom: 0;
+        }
+        .tab {
+            padding: 8px 20px;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-bottom: none;
+            border-radius: 8px 8px 0 0;
+            cursor: pointer;
+            color: #888;
+            font-size: 0.9em;
+            transition: all 0.2s;
+        }
+        .tab.active {
+            background: rgba(0,0,0,0.3);
+            color: #fff;
+            border-color: rgba(255,255,255,0.15);
+        }
+        .footer {
+            text-align: center;
+            padding: 40px 20px;
+            color: #555;
+            font-size: 0.85em;
+            border-top: 1px solid rgba(255,255,255,0.05);
+            margin-top: 40px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧠 AI Hub Madrid</h1>
+        <p>Infraestructura de IA local — Zero Tokens — OpenAI Compatible</p>
+        <span class="badge">● ONLINE</span>
+    </div>
+
+    <div class="container">
+        <!-- Services -->
+        <div class="section-title">Servicios</div>
+        <div class="grid" id="services-grid">
+            <div class="card">
+                <div class="icon">🤖</div>
+                <h3>Ollama <span class="status running" id="ollama-status">● running</span></h3>
+                <p>LLM Chat — llama3.1, mistral, phi3</p>
+                <div class="port">localhost:11434</div>
+            </div>
+            <div class="card">
+                <div class="icon">🎨</div>
+                <h3>ComfyUI <span class="status running" id="comfyui-status">● running</span></h3>
+                <p>Generación de imágenes — SDXL, Flux, SD1.5</p>
+                <div class="port">localhost:8188</div>
+            </div>
+            <div class="card">
+                <div class="icon">🎬</div>
+                <h3>Wan2GP <span class="status running" id="wan2gp-status">● running</span></h3>
+                <p>Generación de video — WAN 2.1, LTX, HunyuanVideo</p>
+                <div class="port">localhost:7860</div>
+            </div>
+            <div class="card">
+                <div class="icon">🎵</div>
+                <h3>DocuMusic <span class="status running" id="documusic-status">● running</span></h3>
+                <p>Generación de música — ACE-Step, YuE, DiffRhythm</p>
+                <div class="port">localhost:8000</div>
+            </div>
+        </div>
+
+        <!-- GPU -->
+        <div class="section-title">GPU</div>
+        <div class="card">
+            <div class="label"><span id="gpu-name">NVIDIA RTX 5080</span><span id="gpu-pct">—</span></div>
+            <div class="gpu-bar">
+                <div class="bar"><div class="bar-fill" id="gpu-fill" style="width: 0%"></div></div>
+            </div>
+            <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:0.85em;color:#888">
+                <span>VRAM: <span id="vram-used">—</span> / <span id="vram-total">16384 MB</span></span>
+                <span>Libre: <span id="vram-free">—</span></span>
+            </div>
+        </div>
+
+        <!-- Endpoints -->
+        <div class="section-title">API Endpoints</div>
+        <div class="card" style="padding:0;overflow:hidden">
+            <table class="endpoint-table">
+                <thead>
+                    <tr><th>Método</th><th>Endpoint</th><th>Descripción</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td><span class="method get">GET</span></td><td><code>/v1/models</code></td><td>Lista modelos disponibles</td></tr>
+                    <tr><td><span class="method post">POST</span></td><td><code>/v1/chat/completions</code></td><td>Chat con LLM (OpenAI compatible)</td></tr>
+                    <tr><td><span class="method post">POST</span></td><td><code>/v1/images/generations</code></td><td>Generar imágenes (ComfyUI)</td></tr>
+                    <tr><td><span class="method post">POST</span></td><td><code>/v1/video/generations</code></td><td>Generar video (Wan2GP)</td></tr>
+                    <tr><td><span class="method post">POST</span></td><td><code>/v1/audio/generations</code></td><td>Generar música (DocuMusic)</td></tr>
+                    <tr><td><span class="method get">GET</span></td><td><code>/v1/status</code></td><td>Estado del hub y GPU</td></tr>
+                    <tr><td><span class="method post">POST</span></td><td><code>/v1/services/{name}/start</code></td><td>Iniciar servicio</td></tr>
+                    <tr><td><span class="method post">POST</span></td><td><code>/v1/services/{name}/stop</code></td><td>Detener servicio</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Quick Start -->
+        <div class="section-title">Cómo usarlo en tus proyectos</div>
+        <div class="tabs">
+            <div class="tab active" onclick="showTab('python')">Python</div>
+            <div class="tab" onclick="showTab('curl')">cURL</div>
+            <div class="tab" onclick="showTab('js')">JavaScript</div>
+        </div>
+        <div class="code-block" id="tab-python">
+<pre><span class="comment"># Instalar: pip install openai</span>
+<span class="keyword">from</span> openai <span class="keyword">import</span> OpenAI
+
+client = OpenAI(
+    base_url=<span class="string">"http://100.105.27.27:9000/v1"</span>,
+    api_key=<span class="string">"not-needed"</span>
+)
+
+<span class="comment"># Chat con LLM</span>
+response = client.chat.completions.create(
+    model=<span class="string">"llama3.1"</span>,
+    messages=[{<span class="string">"role"</span>: <span class="string">"user"</span>, <span class="string">"content"</span>: <span class="string">"Hola, explica IA en 3 líneas"</span>}]
+)
+print(response.choices[0].message.content)</pre>
+        </div>
+        <div class="code-block" id="tab-curl" style="display:none">
+<pre><span class="comment"># Listar modelos</span>
+curl http://100.105.27.27:9000/v1/models
+
+<span class="comment"># Chat con LLM</span>
+curl -X POST http://100.105.27.27:9000/v1/chat/completions \
+  -H <span class="string">"Content-Type: application/json"</span> \
+  -d <span class="string">'{
+    "model": "llama3.1",
+    "messages": [{"role": "user", "content": "Hola"}]
+  }'</span>
+
+<span class="comment"># Generar imagen</span>
+curl -X POST http://100.105.27.27:9000/v1/images/generations \
+  -H <span class="string">"Content-Type: application/json"</span> \
+  -d <span class="string">'{"prompt": "a cyberpunk cat", "model": "sdxl"}'</span></pre>
+        </div>
+        <div class="code-block" id="tab-js" style="display:none">
+<pre><span class="comment">// npm install openai</span>
+<span class="keyword">import</span> OpenAI <span class="keyword">from</span> <span class="string">'openai'</span>;
+
+const client = new OpenAI({
+  baseURL: <span class="string">'http://100.105.27.27:9000/v1'</span>,
+  apiKey: <span class="string">'not-needed'</span>
+});
+
+const response = await client.chat.completions.create({
+  model: <span class="string">'llama3.1'</span>,
+  messages: [{ role: <span class="string">'user'</span>, content: <span class="string">'Hola'</span> }]
+});
+console.log(response.choices[0].message.content);</pre>
+        </div>
+    </div>
+
+    <div class="footer">
+        AI Hub Madrid — RTX 5080 16GB — Zero Tokens — <a href="/docs" style="color:#667eea">Swagger Docs</a>
+    </div>
+
+    <script>
+        function showTab(name) {
+            document.querySelectorAll('.code-block').forEach(e => e.style.display = 'none');
+            document.querySelectorAll('.tab').forEach(e => e.classList.remove('active'));
+            document.getElementById('tab-' + name).style.display = 'block';
+            event.target.classList.add('active');
+        }
+
+        async function refresh() {
+            try {
+                const r = await fetch('/v1/status');
+                const d = await r.json();
+                
+                // Update service statuses
+                for (const [name, info] of Object.entries(d.services)) {
+                    const el = document.getElementById(name + '-status');
+                    if (el) {
+                        el.textContent = '● ' + info.status;
+                        el.className = 'status ' + info.status;
+                    }
+                }
+
+                // Update GPU
+                if (d.gpu.available) {
+                    document.getElementById('gpu-name').textContent = d.gpu.name;
+                    const pct = Math.round((d.gpu.vram_used_mb / d.gpu.vram_total_mb) * 100);
+                    document.getElementById('gpu-pct').textContent = pct + '%';
+                    document.getElementById('gpu-fill').style.width = pct + '%';
+                    document.getElementById('vram-used').textContent = d.gpu.vram_used_mb + ' MB';
+                    document.getElementById('vram-total').textContent = d.gpu.vram_total_mb + ' MB';
+                    document.getElementById('vram-free').textContent = d.gpu.vram_free_mb + ' MB';
+                }
+            } catch(e) { console.error(e); }
+        }
+        refresh();
+        setInterval(refresh, 10000);
+    </script>
+</body>
+</html>
+</task_progress>
+</write_to_file>

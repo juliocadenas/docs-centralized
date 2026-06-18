@@ -1,0 +1,34 @@
+=== ESTADO SERVIDOR (3h post-reboot) ===
+Uptime: up 3 hours, 39 minutes
+Mount root: /dev/sda3 on / type ext4 (rw,relatime)
+Autosuspend: -1
+
+Docker: active
+ai-hub-studio: Up 4 hours
+documusic_backend: Up 4 hours
+ollama_hub: Up 4 hours
+backend-redis-1: Up 4 hours
+
+USB errores dmesg: 1
+[sudo] contraseña para pepe:
+Espacio /: /dev/sda3        220G   179G   31G  86% /
+Espacio /mnt/seagate: /dev/sdb1        1,8T   133G  1,6T   8% /mnt/seagate
+
+Servicios systemd:
+  ai-hub-gateway: active
+  comfyui: active
+  wan2gp: active
+  ollama: active
+
+Procesos Python extra:
+(ninguno)
+
+GPU VRAM:
+704 MiB, 16303 MiB
+
+=== SCRIPTS TTS/STT EN SERVIDOR ===
+No hay scripts TTS/STT
+
+
+Models TTS/STT en /mnt/seagate:
+No hay modelos TTS/STT

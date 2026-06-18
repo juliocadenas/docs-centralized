@@ -1,0 +1,13 @@
+============================================================
+  POST-REBOOT VERIFICATION
+============================================================
+
+Connecting (attempt 1)...
+  Failed: No existing session
+
+Connecting (attempt 2)...
+  Failed: No existing session
+
+Connecting (attempt 3)...
+  Failed: No existing session
+CANNOT CONNECT after 3 attempts. Server may still be booting.

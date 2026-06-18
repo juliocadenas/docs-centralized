@@ -1,0 +1,602 @@
+'use client';
+
+import { useState, useEffect, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+
+const API = 'http://100.105.27.27:9000/v1';
+
+// ============================================================
+// Tool Definitions
+// ============================================================
+const TOOLS = [
+  { id: 'home', name: 'Dashboard', icon: '🏠', cat: '' },
+  { id: 'image-gen', name: 'Generador de Imágenes', icon: '🎨', cat: 'CREAR', desc: 'SDXL, Flux — Genera imágenes fotorrealistas, arte, logos' },
+  { id: 'video-gen', name: 'Generador de Video', icon: '🎬', cat: 'CREAR', desc: 'WAN 2.1, LTX — Videos tipo Sora con tu GPU' },
+  { id: 'music-gen', name: 'Generador de Música', icon: '🎵', cat: 'CREAR', desc: 'ACE-Step — Crea canciones completas tipo Suno' },
+  { id: 'chat-ai', name: 'Chat con IA', icon: '🤖', cat: 'CHAT', desc: 'Llama 3.1, Mistral — Tu asistente de IA local' },
+  { id: 'marketing-copy', name: 'Copy Publicitario', icon: '📝', cat: 'MARKETING', desc: 'Genera textos persuasivos para tus campañas' },
+  { id: 'social-post', name: 'Post Redes Sociales', icon: '📱', cat: 'MARKETING', desc: 'Contenido viral para Instagram, TikTok, X' },
+  { id: 'logo-gen', name: 'Generador de Logos', icon: '✨', cat: 'BRANDING', desc: 'Crea logos profesionales con IA' },
+  { id: 'thumbnail-gen', name: 'Thumbnails YouTube', icon: '🖼️', cat: 'MARKETING', desc: 'Miniaturas que clickan' },
+  { id: 'ad-creator', name: 'Creador de Anuncios', icon: '📢', cat: 'MARKETING', desc: 'Anuncios completos con imagen + copy' },
+  { id: 'email-marketing', name: 'Email Marketing', icon: '📧', cat: 'MARKETING', desc: 'Emails que convierten' },
+  { id: 'blog-writer', name: 'Escritor de Blog', icon: '✍️', cat: 'CONTENIDO', desc: 'Artículos SEO optimizados' },
+  { id: 'slogan-gen', name: 'Generador de Slogans', icon: '💡', cat: 'BRANDING', desc: 'Frases pegadizas para tu marca' },
+  { id: 'video-effects', name: 'Efectos de Video', icon: '⚡', cat: 'EDITAR', desc: 'Efectos tipo Higgsfield — Cámara lenta, zoom' },
+  { id: 'image-upscale', name: 'Upscaler 4x', icon: '🔍', cat: 'EDITAR', desc: 'Mejora resolución con Real-ESRGAN' },
+  { id: 'bg-remove', name: 'Quitar Fondo', icon: '✂️', cat: 'EDITAR', desc: 'Remove Background automático' },
+  { id: 'voiceover', name: 'Locución / Voiceover', icon: '🎙️', cat: 'AUDIO', desc: 'Texto a voz con voces naturales' },
+  { id: 'subtitle-gen', name: 'Subtítulos Auto', icon: '📄', cat: 'EDITAR', desc: 'Genera subtítulos para tus videos' },
+];
+
+// ============================================================
+// API helpers
+// ============================================================
+async function apiChat(messages: Array<{role: string; content: string}>, model = 'llama3.1') {
+  const res = await fetch(`${API}/chat/completions`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model, messages, temperature: 0.7, max_tokens: 2048 }),
+  });
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content || 'Sin respuesta';
+}
+
+async function apiStatus() {
+  const res = await fetch(`${API}/status`);
+  return res.json();
+}
+
+// ============================================================
+// Tool Components
+// ============================================================
+
+function DashboardTool() {
+  const [status, setStatus] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    apiStatus().then(s => { setStatus(s); setLoading(false); }).catch(() => setLoading(false));
+    const iv = setInterval(() => apiStatus().then(setStatus), 10000);
+    return () => clearInterval(iv);
+  }, []);
+
+  const services = status?.services || {};
+  const svcList = [
+    { key: 'ollama', name: 'Ollama LLM', icon: '🤖', port: '11434', desc: 'Chat con Llama 3.1, Mistral' },
+    { key: 'comfyui', name: 'ComfyUI', icon: '🎨', port: '8188', desc: 'Generación de imágenes' },
+    { key: 'wan2gp', name: 'Wan2GP Video', icon: '🎬', port: '7860', desc: 'Generación de video' },
+    { key: 'documusic', name: 'DocuMusic', icon: '🎵', port: '8000', desc: 'Generación de música' },
+  ];
+
+  return (
+    <div className="p-8 max-w-6xl mx-auto">
+      <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-400 via-pink-400 to-orange-400 bg-clip-text text-transparent mb-2">🧠 AI Hub Madrid</h1>
+      <p className="text-gray-400 mb-8">Tu navaja suiza de herramientas IA — Zero Tokens — RTX 5080 16GB</p>
+
+      {/* Services Grid */}
+      <h2 className="text-lg font-semibold text-purple-300 mb-4">Servidores</h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        {svcList.map(s => (
+          <div key={s.key} className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 hover:bg-white/[0.06] transition">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-2xl">{s.icon}</span>
+              <span className={`text-xs px-2 py-1 rounded-full font-semibold ${services[s.key]?.status === 'running' ? 'bg-green-500/20 text-green-400' : 'bg-red-500/20 text-red-400'}`}>
+                ● {services[s.key]?.status || 'checking...'}
+              </span>
+            </div>
+            <h3 className="font-semibold text-white text-sm">{s.name}</h3>
+            <p className="text-xs text-gray-500 mt-1">{s.desc}</p>
+            <p className="text-xs text-gray-600 mt-2">:{s.port}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* GPU */}
+      <h2 className="text-lg font-semibold text-purple-300 mb-4">GPU</h2>
+      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5 mb-8">
+        <div className="flex justify-between mb-2">
+          <span className="text-sm">{status?.gpu?.name || 'NVIDIA RTX 5080'}</span>
+          <span className="text-sm text-gray-400">{status?.gpu?.vram_used_mb ? Math.round(status.gpu.vram_used_mb / status.gpu.vram_total_mb * 100) : 0}%</span>
+        </div>
+        <div className="h-2 bg-white/10 rounded-full overflow-hidden">
+          <div className="h-full rounded-full bg-gradient-to-r from-green-500 via-yellow-500 to-red-500 transition-all" 
+               style={{ width: `${status?.gpu?.vram_used_mb ? Math.round(status.gpu.vram_used_mb / status.gpu.vram_total_mb * 100) : 0}%` }} />
+        </div>
+        <div className="flex justify-between mt-2 text-xs text-gray-500">
+          <span>Usado: {status?.gpu?.vram_used_mb || '—'} MB</span>
+          <span>Total: {status?.gpu?.vram_total_mb || 16384} MB</span>
+        </div>
+      </div>
+
+      {/* Tools Quick Access */}
+      <h2 className="text-lg font-semibold text-purple-300 mb-4">Herramientas ({TOOLS.length - 1})</h2>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
+        {TOOLS.filter(t => t.id !== 'home').map(t => (
+          <div key={t.id} className="bg-white/[0.03] border border-white/[0.06] rounded-xl p-4 hover:bg-white/[0.06] transition cursor-pointer">
+            <span className="text-xl">{t.icon}</span>
+            <h3 className="text-sm font-medium text-white mt-2">{t.name}</h3>
+            <p className="text-xs text-gray-500 mt-1">{t.desc}</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// -- Image Generator --
+function ImageGenTool() {
+  const [prompt, setPrompt] = useState('');
+  const [negative, setNegative] = useState('');
+  const [model, setModel] = useState('sdxl');
+  const [width, setWidth] = useState(1024);
+  const [height, setHeight] = useState(1024);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState('');
+  const [error, setError] = useState('');
+
+  const generate = async () => {
+    setLoading(true); setError(''); setResult('');
+    try {
+      const res = await fetch(`${API}/images/generations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, model, negative_prompt: negative, width, height }),
+      });
+      const data = await res.json();
+      if (data.data?.[0]?.url) setResult(data.data[0].url);
+      else if (data.data?.[0]?.b64_json) setResult(`data:image/png;base64,${data.data[0].b64_json}`);
+      else setResult(JSON.stringify(data));
+    } catch (e: any) { setError(e.message); }
+    setLoading(false);
+  };
+
+  return (
+    <div className="p-8 max-w-4xl mx-auto">
+      <h1 className="text-2xl font-bold text-white mb-1">🎨 Generador de Imágenes</h1>
+      <p className="text-gray-400 text-sm mb-6">SDXL, Flux — Genera imágenes fotorrealistas, arte conceptual, logos, banners</p>
+      
+      <div className="space-y-4">
+        <div>
+          <label className="text-sm text-gray-300 mb-1 block">Describe tu imagen</label>
+          <textarea className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white placeholder-gray-600 resize-none h-32 focus:border-purple-500 focus:outline-none" 
+            placeholder="Un atardecer en Madrid con vista al skyline, estilo cyberpunk, colores vibrantes..." value={prompt} onChange={e => setPrompt(e.target.value)} />
+        </div>
+        <div>
+          <label className="text-sm text-gray-300 mb-1 block">Evitar (negativo)</label>
+          <input className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white placeholder-gray-600 focus:border-purple-500 focus:outline-none"
+            placeholder="blurry, low quality, watermark..." value={negative} onChange={e => setNegative(e.target.value)} />
+        </div>
+        <div className="flex gap-4">
+          <div className="flex-1">
+            <label className="text-sm text-gray-300 mb-1 block">Modelo</label>
+            <select className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white focus:outline-none" value={model} onChange={e => setModel(e.target.value)}>
+              <option value="sdxl">SDXL (Rápido, calidad)</option>
+              <option value="flux">Flux (Alta calidad)</option>
+              <option value="sd15">SD 1.5 (Rápido)</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-sm text-gray-300 mb-1 block">Ancho</label>
+            <input type="number" className="w-28 bg-white/5 border border-white/10 rounded-xl p-3 text-white focus:outline-none" value={width} onChange={e => setWidth(+e.target.value)} />
+          </div>
+          <div>
+            <label className="text-sm text-gray-300 mb-1 block">Alto</label>
+            <input type="number" className="w-28 bg-white/5 border border-white/10 rounded-xl p-3 text-white focus:outline-none" value={height} onChange={e => setHeight(+e.target.value)} />
+          </div>
+        </div>
+        <button onClick={generate} disabled={loading || !prompt}
+          className="w-full py-4 rounded-xl font-bold text-lg bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 disabled:opacity-40 transition">
+          {loading ? '⏳ Generando...' : '🎨 Generar Imagen'}
+        </button>
+        {error && <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">{error}</div>}
+        {result && (
+          <div className="mt-4">
+            {result.startsWith('data:') || result.startsWith('http') ? 
+              <img src={result} alt="Generated" className="w-full rounded-xl border border-white/10" /> :
+              <pre className="p-4 bg-black/30 rounded-xl text-xs text-gray-300 overflow-auto">{result}</pre>
+            }
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// -- Video Generator --
+function VideoGenTool() {
+  const [prompt, setPrompt] = useState('');
+  const [model, setModel] = useState('wan2.1');
+  const [duration, setDuration] = useState(5);
+  const [resolution, setResolution] = useState('480p');
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState('');
+  const [error, setError] = useState('');
+
+  const generate = async () => {
+    setLoading(true); setError(''); setResult('');
+    try {
+      const res = await fetch(`${API}/video/generations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, model, duration_seconds: duration, resolution }),
+      });
+      const data = await res.json();
+      setResult(JSON.stringify(data, null, 2));
+    } catch (e: any) { setError(e.message); }
+    setLoading(false);
+  };
+
+  return (
+    <div className="p-8 max-w-4xl mx-auto">
+      <h1 className="text-2xl font-bold text-white mb-1">🎬 Generador de Video</h1>
+      <p className="text-gray-400 text-sm mb-6">WAN 2.1, LTX Video — Genera videos tipo Sora con tu GPU local</p>
+      
+      <div className="space-y-4">
+        <textarea className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white placeholder-gray-600 resize-none h-32 focus:border-purple-500 focus:outline-none"
+          placeholder="Un dron sobrevolando las calles de Madrid al atardecer, cinematográfico, 4K..." value={prompt} onChange={e => setPrompt(e.target.value)} />
+        <div className="flex gap-4">
+          <select className="flex-1 bg-white/5 border border-white/10 rounded-xl p-3 text-white focus:outline-none" value={model} onChange={e => setModel(e.target.value)}>
+            <option value="wan2.1">WAN 2.1 (Rápido, 1.3B)</option>
+            <option value="ltx">LTX Video</option>
+            <option value="hunyuan">HunyuanVideo (Lento, calidad)</option>
+          </select>
+          <select className="bg-white/5 border border-white/10 rounded-xl p-3 text-white focus:outline-none" value={resolution} onChange={e => setResolution(e.target.value)}>
+            <option value="480p">480p (Rápido)</option>
+            <option value="720p">720p (Más calidad)</option>
+          </select>
+          <input type="range" min={3} max={10} value={duration} onChange={e => setDuration(+e.target.value)} className="flex-1" />
+          <span className="text-sm text-gray-400 self-center">{duration}s</span>
+        </div>
+        <button onClick={generate} disabled={loading || !prompt}
+          className="w-full py-4 rounded-xl font-bold text-lg bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 disabled:opacity-40 transition">
+          {loading ? '⏳ Generando video... (puede tardar 1-5 min)' : '🎬 Generar Video'}
+        </button>
+        {error && <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">{error}</div>}
+        {result && <pre className="p-4 bg-black/30 rounded-xl text-xs text-gray-300 overflow-auto max-h-96">{result}</pre>}
+      </div>
+    </div>
+  );
+}
+
+// -- Music Generator --
+function MusicGenTool() {
+  const [prompt, setPrompt] = useState('');
+  const [model, setModel] = useState('ace-step');
+  const [duration, setDuration] = useState(30);
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState('');
+  const [error, setError] = useState('');
+
+  const generate = async () => {
+    setLoading(true); setError(''); setResult('');
+    try {
+      const res = await fetch(`${API}/audio/generations`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, model, duration_seconds: duration }),
+      });
+      const data = await res.json();
+      setResult(JSON.stringify(data, null, 2));
+    } catch (e: any) { setError(e.message); }
+    setLoading(false);
+  };
+
+  return (
+    <div className="p-8 max-w-4xl mx-auto">
+      <h1 className="text-2xl font-bold text-white mb-1">🎵 Generador de Música</h1>
+      <p className="text-gray-400 text-sm mb-6">ACE-Step — Crea canciones completas tipo Suno con tu GPU</p>
+      
+      <div className="space-y-4">
+        <textarea className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white placeholder-gray-600 resize-none h-32 focus:border-purple-500 focus:outline-none"
+          placeholder="Reggaetón con letra sobre Madrid, ritmo bailable, estilo Bad Bunny..." value={prompt} onChange={e => setPrompt(e.target.value)} />
+        <div className="flex gap-4">
+          <select className="flex-1 bg-white/5 border border-white/10 rounded-xl p-3 text-white focus:outline-none" value={model} onChange={e => setModel(e.target.value)}>
+            <option value="ace-step">ACE-Step (Rápido, 3.5B)</option>
+            <option value="yue">YuE (Más largo)</option>
+            <option value="diffrhythm">DiffRhythm (Rítmico)</option>
+          </select>
+          <div className="flex items-center gap-2">
+            <input type="range" min={10} max={120} value={duration} onChange={e => setDuration(+e.target.value)} className="w-40" />
+            <span className="text-sm text-gray-400">{duration}s</span>
+          </div>
+        </div>
+        <button onClick={generate} disabled={loading || !prompt}
+          className="w-full py-4 rounded-xl font-bold text-lg bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 disabled:opacity-40 transition">
+          {loading ? '⏳ Componiendo...' : '🎵 Generar Música'}
+        </button>
+        {error && <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-400 text-sm">{error}</div>}
+        {result && <pre className="p-4 bg-black/30 rounded-xl text-xs text-gray-300 overflow-auto max-h-96">{result}</pre>}
+      </div>
+    </div>
+  );
+}
+
+// -- Chat AI --
+function ChatAITool() {
+  const [messages, setMessages] = useState<Array<{role: string; content: string}>>([
+    { role: 'assistant', content: '¡Hola! Soy tu IA local corriendo en la RTX 5080. ¿En qué puedo ayudarte?' }
+  ]);
+  const [input, setInput] = useState('');
+  const [loading, setLoading] = useState(false);
+  const chatRef = useRef<HTMLDivElement>(null);
+
+  const send = async () => {
+    if (!input.trim() || loading) return;
+    const userMsg = { role: 'user', content: input };
+    setMessages(prev => [...prev, userMsg]);
+    setInput('');
+    setLoading(true);
+    try {
+      const content = await apiChat([...messages, userMsg]);
+      setMessages(prev => [...prev, { role: 'assistant', content }]);
+    } catch { setMessages(prev => [...prev, { role: 'assistant', content: 'Error conectando con el servidor.' }]); }
+    setLoading(false);
+    setTimeout(() => chatRef.current?.scrollTo(0, chatRef.current.scrollHeight), 100);
+  };
+
+  return (
+    <div className="p-8 max-w-4xl mx-auto h-screen flex flex-col">
+      <h1 className="text-2xl font-bold text-white mb-1">🤖 Chat con IA</h1>
+      <p className="text-gray-400 text-sm mb-4">Llama 3.1 — Tu asistente local, zero tokens, sin límites</p>
+      
+      <div ref={chatRef} className="flex-1 overflow-y-auto space-y-3 mb-4 pr-2">
+        {messages.map((m, i) => (
+          <div key={i} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+            <div className={`max-w-[80%] px-4 py-3 rounded-2xl text-sm whitespace-pre-wrap ${
+              m.role === 'user' ? 'bg-purple-600/30 text-white' : 'bg-white/5 text-gray-200'}`}>
+              {m.content}
+            </div>
+          </div>
+        ))}
+        {loading && <div className="text-gray-500 text-sm animate-pulse">● ● ●</div>}
+      </div>
+      
+      <div className="flex gap-2">
+        <input className="flex-1 bg-white/5 border border-white/10 rounded-xl p-3 text-white placeholder-gray-600 focus:border-purple-500 focus:outline-none"
+          placeholder="Escribe tu mensaje..." value={input} onChange={e => setInput(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && send()} />
+        <button onClick={send} disabled={loading}
+          className="px-6 py-3 rounded-xl font-bold bg-purple-600 hover:bg-purple-500 disabled:opacity-40 transition">
+          Enviar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// -- Marketing Copy Generator --
+function MarketingCopyTool() {
+  const [product, setProduct] = useState('');
+  const [audience, setAudience] = useState('');
+  const [tone, setTone] = useState('persuasivo');
+  const [copyType, setCopyType] = useState<'ad' | 'social' | 'email' | 'slogan' | 'blog'>('ad');
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState('');
+
+  const generate = async () => {
+    setLoading(true); setResult('');
+    const typeNames: Record<string, string> = { ad: 'anuncio publicitario', social: 'post para redes sociales', email: 'email marketing', slogan: '5 slogans creativos', blog: 'artículo de blog' };
+    try {
+      const content = await apiChat([
+        { role: 'system', content: 'Eres un experto en marketing digital y copywriting. Generas contenido persuasivo y creativo. Responde SOLO con el contenido, sin explicaciones.' },
+        { role: 'user', content: `Genera ${typeNames[copyType]} para:\nProducto: ${product}\nPúblico: ${audience}\nTono: ${tone}` },
+      ]);
+      setResult(content);
+    } catch { setResult('Error conectando con el servidor.'); }
+    setLoading(false);
+  };
+
+  return (
+    <div className="p-8 max-w-4xl mx-auto">
+      <h1 className="text-2xl font-bold text-white mb-1">📝 Copy Publicitario</h1>
+      <p className="text-gray-400 text-sm mb-6">Genera textos persuasivos para tus campañas de marketing</p>
+      
+      <div className="space-y-4">
+        <div className="flex gap-2">
+          {(['ad', 'social', 'email', 'slogan', 'blog'] as const).map(t => (
+            <button key={t} onClick={() => setCopyType(t)}
+              className={`px-4 py-2 rounded-lg text-sm transition ${copyType === t ? 'bg-purple-600 text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10'}`}>
+              {{ ad: '📢 Anuncio', social: '📱 Social', email: '📧 Email', slogan: '💡 Slogan', blog: '✍️ Blog' }[t]}
+            </button>
+          ))}
+        </div>
+        <input className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white placeholder-gray-600 focus:border-purple-500 focus:outline-none"
+          placeholder="Producto o servicio (ej: Curso de Marketing Digital)" value={product} onChange={e => setProduct(e.target.value)} />
+        <input className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white placeholder-gray-600 focus:border-purple-500 focus:outline-none"
+          placeholder="Público objetivo (ej: Emprendedores 25-40 años)" value={audience} onChange={e => setAudience(e.target.value)} />
+        <select className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white focus:outline-none" value={tone} onChange={e => setTone(e.target.value)}>
+          <option value="persuasivo">Persuasivo</option>
+          <option value="formal">Formal</option>
+          <option value="casual">Casual / Joven</option>
+          <option value="urgente">Urgente (FOMO)</option>
+          <option value="emocional">Emocional</option>
+          <option value="humorístico">Humorístico</option>
+        </select>
+        <button onClick={generate} disabled={loading || !product}
+          className="w-full py-4 rounded-xl font-bold text-lg bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-500 hover:to-red-500 disabled:opacity-40 transition">
+          {loading ? '⏳ Generando copy...' : '📝 Generar Copy'}
+        </button>
+        {result && (
+          <div className="p-6 bg-white/[0.03] border border-white/[0.06] rounded-2xl">
+            <pre className="text-sm text-gray-200 whitespace-pre-wrap">{result}</pre>
+            <button onClick={() => navigator.clipboard.writeText(result)} className="mt-4 px-4 py-2 bg-white/10 rounded-lg text-sm hover:bg-white/20 transition">📋 Copiar</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// -- Generic LLM-powered tool wrapper for marketing tools --
+function LLMTool({ title, icon, desc, systemPrompt, placeholder, extraFields }: {
+  title: string; icon: string; desc: string; systemPrompt: string; placeholder: string;
+  extraFields?: Array<{ key: string; label: string; placeholder: string }>;
+}) {
+  const [fields, setFields] = useState<Record<string, string>>({});
+  const [prompt, setPrompt] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState('');
+
+  const generate = async () => {
+    setLoading(true); setResult('');
+    const extras = extraFields?.map(f => `${f.label}: ${fields[f.key] || 'N/A'}`).join('\n') || '';
+    try {
+      const content = await apiChat([
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `${extras ? extras + '\n\n' : ''}${prompt}` },
+      ]);
+      setResult(content);
+    } catch { setResult('Error conectando con el servidor.'); }
+    setLoading(false);
+  };
+
+  return (
+    <div className="p-8 max-w-4xl mx-auto">
+      <h1 className="text-2xl font-bold text-white mb-1">{icon} {title}</h1>
+      <p className="text-gray-400 text-sm mb-6">{desc}</p>
+      
+      <div className="space-y-4">
+        {extraFields?.map(f => (
+          <input key={f.key} className="w-full bg-white/5 border border-white/10 rounded-xl p-3 text-white placeholder-gray-600 focus:border-purple-500 focus:outline-none"
+            placeholder={f.placeholder} value={fields[f.key] || ''} onChange={e => setFields(prev => ({ ...prev, [f.key]: e.target.value }))} />
+        ))}
+        <textarea className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white placeholder-gray-600 resize-none h-28 focus:border-purple-500 focus:outline-none"
+          placeholder={placeholder} value={prompt} onChange={e => setPrompt(e.target.value)} />
+        <button onClick={generate} disabled={loading || !prompt}
+          className="w-full py-4 rounded-xl font-bold text-lg bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 disabled:opacity-40 transition">
+          {loading ? '⏳ Generando...' : `${icon} Generar`}
+        </button>
+        {result && (
+          <div className="p-6 bg-white/[0.03] border border-white/[0.06] rounded-2xl">
+            <pre className="text-sm text-gray-200 whitespace-pre-wrap">{result}</pre>
+            <button onClick={() => navigator.clipboard.writeText(result)} className="mt-4 px-4 py-2 bg-white/10 rounded-lg text-sm hover:bg-white/20 transition">📋 Copiar</button>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// -- Coming Soon tool --
+function ComingSoonTool({ title, icon, desc }: { title: string; icon: string; desc: string }) {
+  return (
+    <div className="p-8 max-w-4xl mx-auto">
+      <h1 className="text-2xl font-bold text-white mb-1">{icon} {title}</h1>
+      <p className="text-gray-400 text-sm mb-6">{desc}</p>
+      <div className="p-12 text-center bg-white/[0.03] border border-white/[0.06] rounded-2xl">
+        <div className="text-6xl mb-4">{icon}</div>
+        <h2 className="text-xl font-bold text-white mb-2">Próximamente</h2>
+        <p className="text-gray-400 text-sm">Esta herramienta estará disponible cuando el modelo correspondiente se instale en el servidor.</p>
+        <p className="text-gray-500 text-xs mt-2">Revisa MODEL_CATALOG.md para ver los modelos planificados.</p>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================
+// Tool router
+// ============================================================
+function getToolComponent(id: string) {
+  switch (id) {
+    case 'home': return <DashboardTool />;
+    case 'image-gen': return <ImageGenTool />;
+    case 'video-gen': return <VideoGenTool />;
+    case 'music-gen': return <MusicGenTool />;
+    case 'chat-ai': return <ChatAITool />;
+    case 'marketing-copy': return <MarketingCopyTool />;
+    case 'social-post': return <LLMTool title="Post Redes Sociales" icon="📱" desc="Contenido viral para Instagram, TikTok, X, LinkedIn"
+      systemPrompt="Eres un experto en social media. Genera posts virales con emojis, hashtags y call-to-action. Responde SOLO con el post."
+      placeholder="Describe el post que quieres generar..."
+      extraFields={[{ key: 'platform', label: 'Plataforma', placeholder: 'Plataforma (Instagram, TikTok, X, LinkedIn)' }, { key: 'goal', label: 'Objetivo', placeholder: 'Objetivo (vender, informar, entretener)' }]} />;
+    case 'logo-gen': return <ImageGenTool />; // Reuses image gen with logo-specific defaults
+    case 'thumbnail-gen': return <ImageGenTool />;
+    case 'ad-creator': return <MarketingCopyTool />;
+    case 'email-marketing': return <LLMTool title="Email Marketing" icon="📧" desc="Emails que convierten"
+      systemPrompt="Eres un experto en email marketing. Genera emails con subject line impactante, cuerpo persuasivo y CTA claro."
+      placeholder="Describe el email que quieres enviar..."
+      extraFields={[{ key: 'subject', label: 'Asunto', placeholder: 'Asunto del email' }, { key: 'cta', label: 'CTA', placeholder: 'Call to action (ej: Compra ahora)' }]} />;
+    case 'blog-writer': return <LLMTool title="Escritor de Blog" icon="✍️" desc="Artículos SEO optimizados"
+      systemPrompt="Eres un experto escritor de blogs y SEO. Genera artículos bien estructurados con títulos, subtítulos, y contenido valioso."
+      placeholder="Tema del artículo..."
+      extraFields={[{ key: 'keywords', label: 'Keywords', placeholder: 'Palabras clave SEO (separadas por coma)' }]} />;
+    case 'slogan-gen': return <LLMTool title="Generador de Slogans" icon="💡" desc="Frases pegadizas para tu marca"
+      systemPrompt="Eres un experto en branding. Genera 10 slogans creativos, pegadizos y memorables."
+      placeholder="Describe tu marca o producto..."
+      extraFields={[{ key: 'brand', label: 'Marca', placeholder: 'Nombre de la marca' }]} />;
+    case 'video-effects': return <ComingSoonTool title="Efectos de Video" icon="⚡" desc="Efectos tipo Higgsfield — Cámara lenta, zoom cinemático, transiciones" />;
+    case 'image-upscale': return <ComingSoonTool title="Upscaler 4x" icon="🔍" desc="Mejora resolución con Real-ESRGAN" />;
+    case 'bg-remove': return <ComingSoonTool title="Quitar Fondo" icon="✂️" desc="Remove Background automático" />;
+    case 'voiceover': return <ComingSoonTool title="Locución / Voiceover" icon="🎙️" desc="Texto a voz con voces naturales" />;
+    case 'subtitle-gen': return <ComingSoonTool title="Subtítulos Auto" icon="📄" desc="Genera subtítulos para tus videos" />;
+    default: return <DashboardTool />;
+  }
+}
+
+// ============================================================
+// Main Page
+// ============================================================
+export default function HomePage() {
+  const [activeTool, setActiveTool] = useState('home');
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+
+  const categories = [...new Set(TOOLS.filter(t => t.cat).map(t => t.cat))];
+
+  return (
+    <div className="flex h-screen overflow-hidden">
+      {/* Sidebar */}
+      <motion.aside 
+        className="h-full bg-[#0d0d24] border-r border-white/5 flex flex-col flex-shrink-0 overflow-hidden"
+        animate={{ width: sidebarOpen ? 260 : 64 }}
+        transition={{ duration: 0.2 }}
+      >
+        {/* Logo */}
+        <div className="p-4 flex items-center gap-3 border-b border-white/5 cursor-pointer" onClick={() => setActiveTool('home')}>
+          <span className="text-2xl flex-shrink-0">🧠</span>
+          {sidebarOpen && (
+            <div>
+              <div className="font-bold text-sm bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent">AI Hub Madrid</div>
+              <div className="text-[10px] text-gray-500">Zero Tokens • GPU Local</div>
+            </div>
+          )}
+        </div>
+        
+        <button onClick={() => setSidebarOpen(!sidebarOpen)}
+          className="mx-2 mt-2 p-2 rounded-lg bg-white/5 hover:bg-white/10 transition text-xs text-gray-400">
+          {sidebarOpen ? '◀' : '▶'}
+        </button>
+
+        <nav className="flex-1 overflow-y-auto py-2 px-2 space-y-0.5">
+          {TOOLS.map(tool => (
+            <button key={tool.id} onClick={() => setActiveTool(tool.id)}
+              className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-left transition-all text-sm
+                ${activeTool === tool.id 
+                  ? 'bg-gradient-to-r from-purple-600/30 to-pink-600/20 text-white border border-purple-500/30' 
+                  : 'text-gray-400 hover:bg-white/5 hover:text-gray-200'}`}>
+              <span className="text-base flex-shrink-0">{tool.icon}</span>
+              {sidebarOpen && <span className="truncate text-xs">{tool.name}</span>}
+            </button>
+          ))}
+        </nav>
+
+        {sidebarOpen && (
+          <div className="p-3 border-t border-white/5">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              <span className="text-xs text-green-400">RTX 5080 • Online</span>
+            </div>
+          </div>
+        )}
+      </motion.aside>
+
+      {/* Content */}
+      <main className="flex-1 overflow-y-auto">
+        <AnimatePresence mode="wait">
+          <motion.div key={activeTool} initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} transition={{ duration: 0.15 }}>
+            {getToolComponent(activeTool)}
+          </motion.div>
+        </AnimatePresence>
+      </main>
+    </div>
+  );
+}

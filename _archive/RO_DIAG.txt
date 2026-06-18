@@ -1,0 +1,60 @@
+=== DMESG ERRORES ===
+[   27.024299] pcieport 0000:00:06.0: AER: Multiple Correctable error message received from 0000:00:06.0
+[   27.024308] nvidia 0000:01:00.0: PCIe Bus Error: severity=Correctable, type=Data Link Layer, (Transmitter ID)
+[   27.024310] nvidia 0000:01:00.0:   device [10de:2c02] error status/mask=00001000/0000e000
+[   27.024316] snd_hda_intel 0000:01:00.1: PCIe Bus Error: severity=Correctable, type=Data Link Layer, (Transmitter ID)
+[   27.024317] snd_hda_intel 0000:01:00.1:   device [10de:22e9] error status/mask=00001000/0000e000
+[   27.025986] pcieport 0000:00:06.0: AER: Multiple Correctable error message received from 0000:00:06.0
+[   27.025991] nvidia 0000:01:00.0: PCIe Bus Error: severity=Correctable, type=Data Link Layer, (Transmitter ID)
+[   27.025992] nvidia 0000:01:00.0:   device [10de:2c02] error status/mask=00001000/0000e000
+[   27.025997] snd_hda_intel 0000:01:00.1: PCIe Bus Error: severity=Correctable, type=Data Link Layer, (Transmitter ID)
+[   27.025998] snd_hda_intel 0000:01:00.1:   device [10de:22e9] error status/mask=00001000/0000e000
+[   27.027450] pcieport 0000:00:06.0: AER: Multiple Correctable error message received from 0000:00:06.0
+[   27.027454] nvidia 0000:01:00.0: PCIe Bus Error: severity=Correctable, type=Data Link Layer, (Transmitter ID)
+[   27.027455] nvidia 0000:01:00.0:   device [10de:2c02] error status/mask=00001000/0000e000
+[   27.027460] snd_hda_intel 0000:01:00.1: PCIe Bus Error: severity=Correctable, type=Data Link Layer, (Transmitter ID)
+[   27.027461] snd_hda_intel 0000:01:00.1:   device [10de:22e9] error status/mask=00001000/0000e000
+[   27.036488] pcieport 0000:00:06.0: AER: Multiple Correctable error message received from 0000:00:06.0
+[   27.036494] nvidia 0000:01:00.0: PCIe Bus Error: severity=Correctable, type=Data Link Layer, (Transmitter ID)
+[   27.036496] nvidia 0000:01:00.0:   device [10de:2c02] error status/mask=00001000/0000e000
+[   27.036501] snd_hda_intel 0000:01:00.1: PCIe Bus Error: severity=Correctable, type=Data Link Layer, (Transmitter ID)
+[   27.036502] snd_hda_intel 0000:01:00.1:   device [10de:22e9] error status/mask=00001000/0000e000
+[sudo] contraseña para pepe: 
+=== JOURNAL BOOT ===
+jun 15 08:44:18 pop-os runsvc.sh[1415]: Runner listener exited with error code null
+jun 15 08:44:18 pop-os rustdesk[22957]:     See https://docs.rs/flexi_logger/latest/flexi_logger/error_info/index.html#write
+jun 15 08:44:18 pop-os rustdesk[22957]:     See https://docs.rs/flexi_logger/latest/flexi_logger/error_info/index.html#write
+jun 15 08:44:18 pop-os rustdesk[22957]:     See https://docs.rs/flexi_logger/latest/flexi_logger/error_info/index.html#write
+jun 15 08:44:18 pop-os rustdesk[22957]:     See https://docs.rs/flexi_logger/latest/flexi_logger/error_info/index.html#write
+jun 15 08:44:19 pop-os rustdesk[22957]:     See https://docs.rs/flexi_logger/latest/flexi_logger/error_info/index.html#write
+jun 15 08:44:19 pop-os rustdesk[22957]:     See https://docs.rs/flexi_logger/latest/flexi_logger/error_info/index.html#write
+jun 15 08:44:19 pop-os rustdesk[22957]:     See https://docs.rs/flexi_logger/latest/flexi_logger/error_info/index.html#write
+jun 15 08:44:19 pop-os python[23039]: error: Could not acquire lock
+jun 15 08:44:19 pop-os python[23039]:   Caused by: Read-only file system (os error 30) at path "/home/pepe/.cache/uv/.tmpiWlYKs"
+jun 15 08:44:19 pop-os python[22942]: [ERROR] Failed to execute startup-script: /home/pepe/ComfyUI/custom_nodes/ComfyUI-Manager/prestartup_script.py / Command '['/home/pepe/comfyui_env/bin/python', '-m', 'uv', 'pip', 'freeze']' returned non-zero exit status 2.
+jun 15 08:44:19 pop-os rustdesk[23083]:     See https://docs.rs/flexi_logger/latest/flexi_logger/error_info/index.html#write
+jun 15 08:44:19 pop-os rustdesk[23083]:     See https://docs.rs/flexi_logger/latest/flexi_logger/error_info/index.html#write
+jun 15 08:44:19 pop-os rustdesk[23083]:     See https://docs.rs/flexi_logger/latest/flexi_logger/error_info/index.html#write
+jun 15 08:44:19 pop-os rustdesk[23083]:     See https://docs.rs/flexi_logger/latest/flexi_logger/error_info/index.html#write
+jun 15 08:44:19 pop-os rustdesk[23083]:     See https://docs.rs/flexi_logger/latest/flexi_logger/error_info/index.html#write
+jun 15 08:44:19 pop-os rustdesk[23083]:     See https://docs.rs/flexi_logger/latest/flexi_logger/error_info/index.html#write
+jun 15 08:44:19 pop-os rustdesk[23083]:     See https://docs.rs/flexi_logger/latest/flexi_logger/error_info/index.html#write
+jun 15 08:44:20 pop-os python[22942]:     raise FileNotFoundError(_errno.ENOENT,
+jun 15 08:44:20 pop-os python[22942]: FileNotFoundError: [Errno 2] No usable temporary directory found in ['/tmp', '/var/tmp', '/usr/tmp', '/home/pepe/ComfyUI']
+[sudo] contraseña para pepe: 
+=== MOUNT DETALLADO ===
+/dev/sda3 on / type ext4 (ro,relatime)
+/dev/sda2 on /recovery type vfat (rw,relatime,fmask=0077,dmask=0077,codepage=437,iocharset=iso8859-1,shortname=mixed,errors=remount-ro)
+/dev/sda1 on /boot/efi type vfat (rw,relatime,fmask=0077,dmask=0077,codepage=437,iocharset=iso8859-1,shortname=mixed,errors=remount-ro)
+
+=== INTENTAR REMONTAR RW ===
+[sudo] contraseña para pepe: mount: /: el punto de montaje no se ha montado o una opción es incorrecta.
+       dmesg(1) puede ser que tenga más información tras el fallo de la llamada al sistema de montaje.
+
+=== MOUNT DESPUES ===
+/dev/sda3 on / type ext4 (ro,relatime)
+/dev/sda2 on /recovery type vfat (rw,relatime,fmask=0077,dmask=0077,codepage=437,iocharset=iso8859-1,shortname=mixed,errors=remount-ro)
+/dev/sda1 on /boot/efi type vfat (rw,relatime,fmask=0077,dmask=0077,codepage=437,iocharset=iso8859-1,shortname=mixed,errors=remount-ro)
+
+=== FSTAB OPTIONS ===
+UUID=73b66df5-a1ca-428a-b006-fb8c396311ea  /  ext4  noatime,data=journal,commit=1,errors=remount-ro  0  1

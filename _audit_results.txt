@@ -1,0 +1,190 @@
+=====START_AUDIT=====
+===SECTION:PARTITIONS===
+NAME            SIZE FSTYPE MOUNTPOINT
+sda           232,9G        
+├─sda1         1022M vfat   /boot/efi
+├─sda2            4G vfat   /recovery
+├─sda3        223,9G ext4   /
+└─sda4            4G swap   
+  └─cryptswap     4G swap   [SWAP]
+sdb             1,8T        
+└─sdb1          1,8T ext4   /mnt/seagate
+zram0            16G        [SWAP]
+===SECTION:ROOT_DEV===
+/dev/sda3 /      ext4   rw,noatime,nodioread_nolock,nodelalloc,errors=remount-ro,commit=1
+===SECTION:FSTAB===
+# /etc/fstab: static file system information.
+#
+# Use 'blkid' to print the universally unique identifier for a
+# device; this may be used with UUID= as a more robust way to name devices
+# that works even if disks are added and removed. See fstab(5).
+#
+# <file system>  <mount point>  <type>  <options>  <dump>  <pass>
+PARTUUID=8823a555-9f5d-4390-942f-3713f47570c6  /boot/efi  vfat  umask=0077  0  0
+PARTUUID=007ac09d-931c-4633-8c7a-b5e714c97fdd  /recovery  vfat  umask=0077  0  0
+UUID=73b66df5-a1ca-428a-b006-fb8c396311ea  /  ext4  noatime,commit=1,errors=remount-ro  0  1
+/dev/mapper/cryptswap  none  swap  defaults  0  0
+192.168.1.210:/srv/comfyui_models /mnt/nfs_models nfs defaults,_netdev 0 0
+192.168.1.210:/mnt/ai_models /mnt/ai_models nfs defaults 0 0
+UUID=90322c7c-47bb-4302-8335-a77adc7e4fa5 /mnt/seagate ext4 defaults,nofail 0 2
+===SECTION:CMDLINE===
+initrd=\EFI\Pop_OS-73b66df5-a1ca-428a-b006-fb8c396311ea\initrd.img root=UUID=73b66df5-a1ca-428a-b006-fb8c396311ea ro quiet loglevel=0 systemd.show_status=false splash nvidia-drm.modeset=1 usbcore.autosuspend=-1 usbcore.usbfs_memory_mb=0
+===SECTION:KERNELSTUB===
+{
+  "default": {
+    "kernel_options": [
+      "quiet",
+      "splash"
+    ],
+    "esp_path": "/boot/efi",
+    "setup_loader": false,
+    "manage_mode": false,
+    "force_update": false,
+    "live_mode": false,
+    "config_rev": 3
+  },
+  "user": {
+    "kernel_options": [
+      "quiet",
+      "loglevel=0",
+      "systemd.show_status=false",
+      "splash",
+      "nvidia-drm.modeset=1",
+      "usbcore.autosuspend=-1",
+      "usbcore.usbfs_memory_mb=0"
+    ],
+    "esp_path": "/boot/efi",
+    "setup_loader": true,
+    "manage_mode": true,
+    "force_update": false,
+    "live_mode": false,
+    "config_rev": 3
+  }
+}===SECTION:EFI_LS===
+===SECTION:EFI_CMDLINE_FILES===
+===SECTION:INITRAMFS_PREMOUNT===
+total 12
+drwxr-xr-x  2 root root 4096 jun 15 08:21 .
+drwxr-xr-x 12 root root 4096 abr 23 00:57 ..
+-rwxr-xr-x  1 root root 1187 jun 15 08:21 usb-ssd-recovery
+===SECTION:INITRAMFS_BOTTOM===
+total 8
+drwxr-xr-x  2 root root 4096 dic  4  2025 .
+drwxr-xr-x 12 root root 4096 abr 23 00:57 ..
+===SECTION:KERNEL===
+6.18.7-76061807-generic
+===SECTION:INITRAMFS_BINS===
+fsck:FOUND:usr/sbin/fsck
+e2fsck:FOUND:usr/sbin/e2fsck
+blkid:FOUND:usr/sbin/blkid
+reboot:FOUND:usr/bin/reboot
+sync:FOUND:usr/bin/sync
+grep:FOUND:usr/bin/grep
+awk:FOUND:usr/bin/awk
+cat:FOUND:usr/bin/cat
+sleep:FOUND:usr/bin/sleep
+===SECTION:NVIDIA_SMI===
+Unable to determine the device handle for GPU0: 0000:01:00.0: Unknown Error
+No devices were found
+===SECTION:NVIDIA_LSMOD===
+nvidia_uvm           2154496  4
+nvidia_drm            139264  1
+nvidia_modeset       1818624  1 nvidia_drm
+nvidia              14413824  11 nvidia_uvm,nvidia_modeset
+drm_ttm_helper         16384  2 nvidia_drm,xe
+video                  77824  3 xe,i915,nvidia_modeset
+===SECTION:NVIDIA_LSPCI===
+01:00.0 VGA compatible controller: NVIDIA Corporation Device 2c02 (rev a1)
+01:00.1 Audio device: NVIDIA Corporation Device 22e9 (rev a1)
+===SECTION:SERVICES_INSTALLED===
+actions.runner.juliocadenas-documusic.pop-os.service enabled         enabled
+ai-hub-effects.service                               enabled         enabled
+ai-hub-gateway.service                               enabled         enabled
+comfyui.service                                      disabled        enabled
+documusic-ensure.service                             enabled         enabled
+effects.service                                      disabled        enabled
+effects_services.service                             disabled        enabled
+hallo2.service                                       disabled        enabled
+latentsync.service                                   disabled        enabled
+liveportrait.service                                 disabled        enabled
+musetalk.service                                     disabled        enabled
+ollama.service                                       enabled         enabled
+stt.service                                          enabled         enabled
+tts.service                                          enabled         enabled
+wan2gp.service                                       disabled        enabled
+===SECTION:SERVICES_RUNNING===
+  actions.runner.juliocadenas-documusic.pop-os.service loaded active running GitHub Actions Runner (juliocadenas-documusic.pop-os)
+  ai-hub-effects.service                               loaded active running AI Hub Effects v2 (Rembg + Upscale)
+  ai-hub-gateway.service                               loaded active running AI Hub Gateway v2
+  avatar.service                                       loaded active running AI Hub Avatar Services (Hallo2, LatentSync, LivePortrait, MuseTalk)
+  avatar_services.service                              loaded active running Avatar AI Services (Hallo2, LatentSync, LivePortrait, MuseTalk)
+  ollama.service                                       loaded active running Ollama Service
+  stt.service                                          loaded active running Whisper large-v3 STT Service
+  tts.service                                          loaded active running Piper TTS Service
+===SECTION:SMART===
+smartctl 7.4 2023-08-01 r5530 [x86_64-linux-6.18.7-76061807-generic] (local build)
+Copyright (C) 2002-23, Bruce Allen, Christian Franke, www.smartmontools.org
+
+/dev/sda: Unknown USB bridge [0x7825:0xa2a4 (0x4101)]
+Please specify device type with the -d option.
+
+Use smartctl -h to get a usage summary
+
+SMARTCTL_UNAVAILABLE
+===SECTION:DISK_MODEL===
+NAME  MODEL                SIZE ROTA TYPE
+sda   PNY 250GB SATA SSD 232,9G    1 disk
+sdb   Portable             1,8T    1 disk
+zram0                       16G    0 disk
+===SECTION:FS_TYPE===
+S.ficheros     Tipo Tamaño Usados  Disp Uso% Montado en
+/dev/sda3      ext4   220G   189G   20G  91% /
+===SECTION:MOUNT_ROOT===
+/dev/sda3 on / type ext4 (rw,noatime,nodioread_nolock,nodelalloc,errors=remount-ro,commit=1)
+===SECTION:INITRAMFS_SIZE===
+-rw-r--r-- 1 root root  36M abr 23 01:25 /boot/initrd.img-6.17.9-76061709-generic
+-rw-r--r-- 1 root root 129M jun 15 08:40 /boot/initrd.img-6.18.7-76061807-generic
+===SECTION:CRONTAB_USER===
+*/5 * * * * /mnt/seagate/scripts/health_check.sh
+0 3 * * 0 /mnt/seagate/scripts/backup.sh
+===SECTION:CRONTAB_ROOT===
+# 
+# 0 5 * * 1 tar -zcf /var/backups/home.tgz /home/
+# and day of week (dow) or use '*' in these fields (for 'any').
+# and what command to run for the task
+# at 5 a.m every week with:
+# daemon's notion of time and timezones.
+# Each task to run has to be defined through a single line
+# Edit this file to introduce tasks to be run by cron.
+# email to the user the crontab file belongs to (unless redirected).
+# For example, you can run a backup of all your user accounts
+# For more information see the manual pages of crontab(5) and cron(8)
+# indicating with different fields when the task will be run
+# m h  dom mon dow   command
+# minute (m), hour (h), day of month (dom), month (mon),
+# Notice that tasks will be started based on the cron's system
+# Output of the crontab jobs (including errors) is sent through
+# To define the time you can provide concrete values for
+0 * * * * /usr/local/bin/disk-monitor.sh
+0 4 * * * /usr/local/bin/system-backup.sh
+*/5 * * * * /mnt/seagate/scripts/tailscale_keepalive.sh
+===SECTION:UPTIME===
+ 10:09:30 up 31 min,  2 users,  load average: 2,28, 1,48, 1,05
+===SECTION:MEMORY===
+               total       usado       libre  compartido   búf/caché  disponible
+Mem:            31Gi       4,9Gi        20Gi       126Mi       7,4Gi        26Gi
+Inter:          19Gi          0B        19Gi
+===SECTION:TUNE2FS===
+Root: /dev/sda3
+Filesystem state:         clean
+Errors behavior:          Continue
+Mount count:              1
+Maximum mount count:      1
+===SECTION:GPU_PROCS===
+No devices were found
+NO_GPU_PROCS
+===SECTION:DMESG_ERRORS===
+[ 1615.662621] nvidia 0000:01:00.0: AER:   Error of this Agent is reported first
+[ 1687.252076] nvidia 0000:01:00.0: AER:   Error of this Agent is reported first
+[ 1905.625060] nvidia 0000:01:00.0: AER:   Error of this Agent is reported first
+=====END_AUDIT=====

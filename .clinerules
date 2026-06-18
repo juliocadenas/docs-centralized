@@ -1,0 +1,67 @@
+# 🧠 AI Hub Madrid - Instrucciones para Agentes de IA (Cline/Cursor)
+
+## Contexto de Infraestructura IA
+
+Este repositorio es el **HUB centralizado** de toda la infraestructura de IA. Antes de trabajar en cualquier tarea, lee estos archivos para entender el estado actual:
+
+### Archivos Obligatorios (leer al inicio de cada sesión):
+1. **`INFRASTRUCTURE_MAP.md`** - Mapa maestro de toda la infraestructura (red, puertos, servicios, credenciales)
+2. **`MODEL_CATALOG.md`** - Catálogo completo de modelos instalados y planificados
+3. **`PROJECT_REGISTRY.md`** - Registry de proyectos y qué servicios AI usan
+4. **`SERVER_GPU_MAP.md`** - Detalle técnico del hardware y configuración del servidor
+
+### AI Hub Gateway
+El componente principal es el **AI Hub Gateway** (`ai-hub-gateway/`), un FastAPI que actúa como API unificada compatible con OpenAI:
+- Endpoint base: `http://100.105.27.27:9000/v1`
+- Docs: `http://100.105.27.27:9000/docs`
+- Proxy a Ollama, ComfyUI, DocuMusic, Wan2GP, TTS, STT, MuseTalk, LivePortrait, Rembg, Upscale
+- GPU Manager para gestión de VRAM (16GB RTX 5080)
+- Model Registry dinámico
+- **19 endpoints** incluyendo:
+  - `/v1/chat/completions` - LLM Chat (Ollama)
+  - `/v1/images/generations` - Image Generation (ComfyUI)
+  - `/v1/audio/generations` + `/v1/audio/speech` + `/v1/audio/transcriptions`
+  - `/v1/video/generations` - Video Generation (Wan2GP)
+  - `/v1/avatar/lipsync` - Lip-sync (MuseTalk/LatentSync)
+  - `/v1/avatar/portrait` - Portrait Animation (LivePortrait)
+  - `/v1/avatar/digital-human` - Pipeline completo: LLM→TTS→Lip-sync
+  - `/v1/effects/remove-bg` + `/v1/effects/upscale`
+  - `/v1/status` + `/v1/infrastructure` + `/v1/models`
+- **Systemd service**: `ai-hub-gateway.service` (auto-restart)
+- **Health Check**: cron cada 5 min, auto-recovery (`/mnt/seagate/scripts/health_check.sh`)
+- **Backup**: cron semanal, 30 días retención (`/mnt/seagate/scripts/backup.sh`)
+
+### Servidor de IA (Madrid - NAB9)
+- **Tailscale:** 100.105.27.27 (cuenta juliocadenas@gmail.com) | **LAN:** 192.168.1.42
+- **Hardware:** RTX 5080 16GB VRAM + 32GB RAM
+- **Almacenamiento AI:** `/mnt/seagate/` (1.8TB USB 3)
+- **Modelos:** Centralizados en `/mnt/seagate/models/` con symlinks en `/mnt/seagate/links/`
+
+### Reglas de Desarrollo:
+1. **Zero tokens** - Todo corre en hardware propio, no usar APIs externas de pago
+2. **Compatible OpenAI** - Los endpoints del Gateway deben ser compatibles con la API de OpenAI
+3. **Docker-first** - Los nuevos servicios se despliegan en Docker
+4. **Modelos en `/mnt/seagate/`** - Todo lo pesado va al disco USB de 1.8TB
+5. **Un modelo = una ruta canónica** - No duplicar modelos
+6. **Symlinks para compatibilidad** - En `/mnt/seagate/links/` para cada herramienta
+
+### Al crear un proyecto nuevo:
+- Consultar `MODEL_CATALOG.md` para modelos disponibles
+- Usar `http://100.105.27.27:9000/v1` como base_url del Gateway
+- Registrar el proyecto en `PROJECT_REGISTRY.md`
+- Añadir `.clinerules` al proyecto apuntando aquí
+
+### Servidor XEON (SERVIDOR01 - Proxmox)
+- **Tailscale:** 100.83.253.87 (cuenta juliocadenas@gmail.com) | **LAN:** 192.168.1.210
+- **Hardware:** Xeon 48 núcleos, 188GB RAM (sin GPU dedicada)
+- **Almacenamiento:** 2.45TB LVM
+- **Rol:** CPU-heavy tasks, scrapers, bases de datos, proyectos sin GPU
+- **Servicios:** Europa Scraper (:8001), NFS exports
+- **Nota:** Físicamente al lado del NAB9, conectados por LAN directa
+
+### Al añadir un modelo nuevo:
+- Añadir entrada en `MODEL_CATALOG.md`
+- Actualizar `model_registry.yaml`
+- Descargar a ruta canónica en `/mnt/seagate/models/{categoria}/`
+- Crear wrapper Docker/FastAPI usando template
+- Registrar en el Gateway como servicio enrutable
