@@ -1,0 +1,25 @@
+#!/usr/bin/env python3
+"""Read the effects service and image router to find root causes."""
+import paramiko, sys
+sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+
+s = paramiko.SSHClient()
+s.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+s.connect('100.105.27.27', username='pepe', password='pepe1234', timeout=30)
+
+# 1. Read effects_service_real.py fully
+print("=== effects_service_real.py (FULL) ===")
+_, o, _ = s.exec_command('cat /mnt/seagate/ai-hub-gateway/effects_service_real.py 2>/dev/null')
+print(o.read().decode(errors='replace'))
+
+# 2. Read images router fully
+print("\n=== images.py router (FULL) ===")
+_, o, _ = s.exec_command('cat /mnt/seagate/ai-hub-gateway/gateway/routers/images.py 2>/dev/null')
+print(o.read().decode(errors='replace'))
+
+# 3. Read main.py to see how routers are wired
+print("\n=== main.py (router wiring) ===")
+_, o, _ = s.exec_command('cat /mnt/seagate/ai-hub-gateway/main.py 2>/dev/null')
+print(o.read().decode(errors='replace'))
+
+s.close()
