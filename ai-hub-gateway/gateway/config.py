@@ -25,7 +25,7 @@ DOCUMUSIC_BASE_URL = os.getenv("DOCUMUSIC_BASE_URL", "http://localhost:8000")
 WAN2GP_BASE_URL = os.getenv("WAN2GP_BASE_URL", "http://localhost:7860")
 PIPER_TTS_URL = os.getenv("PIPER_TTS_URL", "http://localhost:8010")
 WHISPER_STT_URL = os.getenv("WHISPER_STT_URL", "http://localhost:8020")
-MUSETALK_URL = os.getenv("MUSETALK_URL", "http://localhost:8041")
+MUSETALK_URL = os.getenv("MUSETALK_URL", "http://localhost:8040")
 LATENTSYNC_URL = os.getenv("LATENTSYNC_URL", "http://localhost:8043")
 LIVEPORTRAIT_URL = os.getenv("LIVEPORTRAIT_URL", "http://localhost:8044")
 HALLO2_URL = os.getenv("HALLO2_URL", "http://localhost:8070")
@@ -106,7 +106,7 @@ SERVICES = {
     "musetalk": {
         "name": "MuseTalk Lip-sync",
         "base_url": MUSETALK_URL,
-        "port": 8041,
+        "port": 8040,
         "type": "avatar",
         "health_endpoint": "/",
         "systemd_service": "musetalk",
