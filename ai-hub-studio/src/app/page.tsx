@@ -61,7 +61,7 @@ const LLM_MODELS = [
   { id: 'llama3.1', name: 'Llama 3.1', desc: 'Rápido y versátil', icon: '🦙' },
 ];
 
-import { chatCompletions, chatCompletionsStream, getHubStatus } from '../lib/api';
+import { chatCompletions, chatCompletionsStream, getHubStatus, generateSpeech, transcribeAudio } from '../lib/api';
 
 async function apiChat(messages: {role:string;content:string}[], model='qwen2.5:7b') {
   const res = await chatCompletions(messages as any, model);
@@ -476,6 +476,9 @@ function InlineToolPage({ tool }: { tool:Tool }) {
   switch(tool.id) {
     case 'marketing-copy': case 'social-post': case 'blog-writer': case 'slogan-gen': return <MarketingTool tool={tool}/>;
     case 'chat-ai': return <ChatTool/>;
+    case 'tts': case 'xtts': case 'fish': return <VoiceTool tool={tool}/>;
+    case 'stt': return <STTTool/>;
+    case 'digital-human': return <DigitalHumanTool/>;
     default: return <div className="flex items-center justify-center h-full text-gray-500">Interfaz disponible cuando el servicio este activo.</div>;
   }
 }
@@ -661,6 +664,223 @@ function ChatTool() {
         />
         <button onClick={send} disabled={loading||!input.trim()} className="px-6 py-3 rounded-xl font-bold bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 disabled:cursor-not-allowed transition text-sm text-white">Enviar</button>
       </div>
+    </div>
+  );
+}
+
+/* ── VOICE TOOL (TTS) ── */
+function VoiceTool({ tool }: { tool:Tool }) {
+  const [text, setText] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [audioUrl, setAudioUrl] = useState('');
+  const [language, setLanguage] = useState('es');
+  const [voice, setVoice] = useState('');
+  const [error, setError] = useState('');
+
+  const ttsModel = tool.id === 'xtts' ? 'xtts' : tool.id === 'fish' ? 'fish' : 'piper';
+
+  const generate = async () => {
+    if (!text.trim()) return;
+    setLoading(true); setError(''); setAudioUrl('');
+    try {
+      const blob = await generateSpeech({
+        input: text,
+        model: ttsModel,
+        language,
+        voice: voice || undefined,
+      });
+      const url = URL.createObjectURL(blob);
+      setAudioUrl(url);
+    } catch(e: any) {
+      setError(e.message || 'Error generando audio');
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="h-full flex flex-col p-6 max-w-3xl mx-auto">
+      <h2 className="text-lg font-bold text-white mb-1">{tool.icon} {tool.name}</h2>
+      <p className="text-xs text-gray-500 mb-4">Convierte texto a voz{ttsModel !== 'piper' ? ' con clonacion de voz' : ''}</p>
+
+      <div className="flex gap-3 mb-3">
+        <select value={language} onChange={e=>setLanguage(e.target.value)} className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white">
+          <option value="es">🇪🇸 Español</option>
+          <option value="en">🇬🇧 English</option>
+          <option value="fr">🇫🇷 Français</option>
+          <option value="de">🇩🇪 Deutsch</option>
+          <option value="it">🇮🇹 Italiano</option>
+          <option value="pt">🇵🇹 Português</option>
+        </select>
+        {ttsModel !== 'piper' && (
+          <input
+            placeholder="Nombre de voz (opcional)..."
+            value={voice}
+            onChange={e=>setVoice(e.target.value)}
+            className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm text-white placeholder-gray-600"
+          />
+        )}
+      </div>
+
+      <textarea
+        className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white placeholder-gray-600 resize-none h-40 focus:border-purple-500 focus:outline-none text-sm mb-3"
+        placeholder="Escribe el texto que quieres convertir a voz..."
+        value={text}
+        onChange={e=>setText(e.target.value)}
+      />
+      <button onClick={generate} disabled={loading||!text.trim()} className={`w-full py-3 rounded-xl font-bold text-sm bg-gradient-to-r ${tool.gradient} disabled:opacity-40 transition mb-4 text-white`}>
+        {loading ? '🎙️ Generando...' : '🎙️ Generar Audio'}
+      </button>
+      {error && <div className="text-red-400 text-sm mb-3">❌ {error}</div>}
+      {audioUrl && (
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+          <p className="text-xs text-gray-500 mb-3">Audio generado:</p>
+          <audio controls src={audioUrl} className="w-full"/>
+          <a href={audioUrl} download="tts-output.wav" className="mt-3 inline-block px-4 py-2 bg-white/10 rounded-lg text-xs hover:bg-white/20 transition text-white">⬇️ Descargar</a>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── STT TOOL (Speech-to-Text) ── */
+function STTTool() {
+  const [transcript, setTranscript] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [fileName, setFileName] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const transcribe = async (file: File) => {
+    setLoading(true); setError(''); setTranscript(''); setFileName(file.name);
+    try {
+      const result = await transcribeAudio({ file, language: 'es' });
+      setTranscript(result.text || 'Sin texto reconocido');
+    } catch(e: any) {
+      setError(e.message || 'Error transcribiendo audio');
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="h-full flex flex-col p-6 max-w-3xl mx-auto">
+      <h2 className="text-lg font-bold text-white mb-1">🎤 Whisper STT</h2>
+      <p className="text-xs text-gray-500 mb-4">Transcribe audio a texto en 100+ idiomas</p>
+
+      <div
+        onClick={() => inputRef.current?.click()}
+        className="border-2 border-dashed border-white/10 rounded-2xl p-12 text-center cursor-pointer hover:border-white/20 transition mb-4"
+      >
+        <div className="text-5xl mb-3">🎤</div>
+        <p className="text-sm text-gray-400">{fileName || 'Click para subir archivo de audio'}</p>
+        <p className="text-[10px] text-gray-600 mt-1">MP3, WAV, M4A, FLAC</p>
+        <input
+          ref={inputRef}
+          type="file"
+          accept="audio/*"
+          className="hidden"
+          onChange={e => e.target.files?.[0] && transcribe(e.target.files[0])}
+        />
+      </div>
+
+      {loading && <div className="text-center text-cyan-400 text-sm animate-pulse">📝 Transcribiendo...</div>}
+      {error && <div className="text-red-400 text-sm mb-3">❌ {error}</div>}
+      {transcript && (
+        <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+          <p className="text-xs text-gray-500 mb-2">Transcripción:</p>
+          <p className="text-sm text-gray-200 whitespace-pre-wrap">{transcript}</p>
+          <button onClick={()=>navigator.clipboard.writeText(transcript)} className="mt-3 px-4 py-2 bg-white/10 rounded-lg text-xs hover:bg-white/20 transition text-white">📋 Copiar</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ── DIGITAL HUMAN TOOL (Full Pipeline) ── */
+function DigitalHumanTool() {
+  const [prompt, setPrompt] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [step, setStep] = useState('');
+  const [result, setResult] = useState<{text?:string; audio_url?:string}|null>(null);
+  const [error, setError] = useState('');
+  const [llmModel, setLlmModel] = useState('qwen2.5:7b');
+  const [ttsModel, setTtsModel] = useState('piper');
+
+  const generate = async () => {
+    if (!prompt.trim()) return;
+    setLoading(true); setError(''); setResult(null);
+    try {
+      setStep('1/3 🧠 Generando texto con IA...');
+      const llmRes = await chatCompletions([
+        {role:'system', content:'Eres un presentador amable. Responde de forma natural y concisa (max 3 frases). Idioma: español.'},
+        {role:'user', content: prompt}
+      ], llmModel);
+      const generatedText = llmRes.choices?.[0]?.message?.content || '';
+
+      setStep('2/3 🎙️ Convirtiendo a voz...');
+      const audioBlob = await generateSpeech({
+        input: generatedText,
+        model: ttsModel,
+        language: 'es',
+      });
+      const audioUrl = URL.createObjectURL(audioBlob);
+
+      setStep('3/3 ✓ Completo');
+      setResult({ text: generatedText, audio_url: audioUrl });
+      setStep('');
+    } catch(e: any) {
+      setError(e.message || 'Error en el pipeline');
+    }
+    setLoading(false);
+  };
+
+  return (
+    <div className="h-full flex flex-col p-6 max-w-3xl mx-auto">
+      <h2 className="text-lg font-bold text-white mb-1">🧑‍💻 Humano Digital</h2>
+      <p className="text-xs text-gray-500 mb-4">Pipeline: IA genera texto → TTS lo narra → (proximo: Lip-sync anima avatar)</p>
+
+      <div className="flex gap-3 mb-3 flex-wrap">
+        <select value={llmModel} onChange={e=>setLlmModel(e.target.value)} className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white">
+          <option value="qwen2.5:7b">🧠 Qwen 2.5</option>
+          <option value="qwen2.5-coder:7b">💻 Qwen Coder</option>
+          <option value="llama3.1">🦙 Llama 3.1</option>
+        </select>
+        <select value={ttsModel} onChange={e=>setTtsModel(e.target.value)} className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-xs text-white">
+          <option value="piper">🎙️ Piper TTS</option>
+          <option value="xtts">🗣️ XTTS-v2</option>
+          <option value="fish">🐟 Fish Speech</option>
+        </select>
+      </div>
+
+      <textarea
+        className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white placeholder-gray-600 resize-none h-28 focus:border-purple-500 focus:outline-none text-sm mb-3"
+        placeholder="¿Que quieres que diga tu humano digital?"
+        value={prompt}
+        onChange={e=>setPrompt(e.target.value)}
+      />
+      <button onClick={generate} disabled={loading||!prompt.trim()} className="w-full py-3 rounded-xl font-bold text-sm bg-gradient-to-r from-emerald-500 to-teal-500 disabled:opacity-40 transition mb-4 text-white">
+        {loading ? step || 'Procesando...' : '🚀 Generar Humano Digital'}
+      </button>
+
+      {error && <div className="text-red-400 text-sm mb-3">❌ {error}</div>}
+      {result && (
+        <div className="space-y-4">
+          {result.text && (
+            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+              <p className="text-xs text-gray-500 mb-2">📝 Texto generado:</p>
+              <p className="text-sm text-gray-200">{result.text}</p>
+            </div>
+          )}
+          {result.audio_url && (
+            <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-5">
+              <p className="text-xs text-gray-500 mb-2">🎙️ Audio:</p>
+              <audio controls src={result.audio_url} className="w-full"/>
+            </div>
+          )}
+          <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3 text-center">
+            <p className="text-xs text-amber-400">ℹ️ El paso de Lip-sync (video) estara disponible cuando inicies un servicio de avatar</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -229,3 +229,130 @@ export async function manageService(service: string, action: 'start' | 'stop') {
   if (!res.ok) throw new Error(`Service ${action} error`);
   return res.json();
 }
+
+// === TTS (Text-to-Speech) ===
+export async function generateSpeech(params: {
+  input: string;
+  model?: string; // 'piper' | 'xtts' | 'fish'
+  voice?: string;
+  language?: string;
+  speaker_wav?: string;
+  response_format?: string;
+}): Promise<Blob> {
+  const res = await fetch(`${GATEWAY_URL}/audio/speech`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) throw new Error(`TTS error: ${res.status}`);
+  return res.blob();
+}
+
+// === STT (Speech-to-Text) ===
+export async function transcribeAudio(params: {
+  file: File;
+  language?: string;
+  model?: string;
+}): Promise<{ text: string; language?: string; duration?: number }> {
+  const formData = new FormData();
+  formData.append('file', params.file);
+  formData.append('language', params.language || 'es');
+  if (params.model) formData.append('model', params.model);
+
+  const res = await fetch(`${GATEWAY_URL}/audio/transcriptions`, {
+    method: 'POST',
+    body: formData,
+  });
+  if (!res.ok) throw new Error(`STT error: ${res.status}`);
+  return res.json();
+}
+
+// === List available TTS voices ===
+export async function listVoices(): Promise<{
+  engines: string[];
+  voices: Record<string, string[]>;
+}> {
+  const res = await fetch(`${GATEWAY_URL}/audio/voices`);
+  if (!res.ok) throw new Error('Cannot fetch voices');
+  return res.json();
+}
+
+// === Avatar / Lip-sync ===
+export async function lipsyncVideo(params: {
+  video_url?: string;
+  audio_url?: string;
+  model?: string; // 'musetalk' | 'latentsync' | 'sadtalker' | 'wav2lip'
+}): Promise<{ video_url: string; model: string }> {
+  const res = await fetch(`${GATEWAY_URL}/avatar/lipsync`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) throw new Error(`Lipsync error: ${res.status}`);
+  return res.json();
+}
+
+// === Avatar / Portrait Animation ===
+export async function animatePortrait(params: {
+  image_url: string;
+  motion?: string;
+  model?: string; // 'liveportrait'
+}): Promise<{ video_url: string; model: string }> {
+  const res = await fetch(`${GATEWAY_URL}/avatar/portrait`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) throw new Error(`Portrait animation error: ${res.status}`);
+  return res.json();
+}
+
+// === Digital Human (Full Pipeline: LLM → TTS → Lip-sync) ===
+export async function createDigitalHuman(params: {
+  prompt: string;
+  image_url?: string;
+  llm_model?: string;
+  tts_model?: string;
+  lipsync_model?: string;
+  voice?: string;
+  language?: string;
+}): Promise<{
+  text: string;
+  audio_url: string;
+  video_url: string;
+}> {
+  const res = await fetch(`${GATEWAY_URL}/avatar/digital-human`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) throw new Error(`Digital human error: ${res.status}`);
+  return res.json();
+}
+
+// === Effects: Remove Background ===
+export async function removeBackground(params: {
+  image_url: string;
+}): Promise<{ image_url: string }> {
+  const res = await fetch(`${GATEWAY_URL}/effects/remove-bg`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) throw new Error(`Remove bg error: ${res.status}`);
+  return res.json();
+}
+
+// === Effects: Upscale ===
+export async function upscaleImage(params: {
+  image_url: string;
+  scale?: number; // 2, 4
+}): Promise<{ image_url: string }> {
+  const res = await fetch(`${GATEWAY_URL}/effects/upscale`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) throw new Error(`Upscale error: ${res.status}`);
+  return res.json();
+}
