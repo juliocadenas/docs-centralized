@@ -1,14 +1,26 @@
 # 🧠 AI Hub Madrid - Instrucciones para Agentes de IA (Cline/Cursor)
 
+## 📚 Documentación Centralizada (OBLIGATORIO)
+
+**Toda la documentación vive ahora en el repo `docs-centralized`.**
+- **Local:** `../docs-centralized/docs/`
+- **Web:** https://juliocadenas.github.io/docs-centralized (cuando se habilite GitHub Pages)
+
+### ANTES de cualquier tarea, leer:
+1. **`../docs-centralized/docs/rules/global-rules.md`** - Reglas universales
+2. **`../docs-centralized/docs/rules/nab9-rules.md`** - Reglas específicas del servidor GPU
+3. **`../docs-centralized/docs/index.md`** - Índice maestro
+
+### DESPUÉS de cada cambio en infraestructura:
+1. Actualizar el archivo correspondiente en `../docs-centralized/docs/`
+2. Hacer commit + push: `git -C ../docs-centralized add . && git -C ../docs-centralized commit -m "actualiza X" && git -C ../docs-centralized push`
+3. **NUNCA terminar una tarea sin confirmar que la docs está al día**
+
+---
+
 ## Contexto de Infraestructura IA
 
-Este repositorio es el **HUB centralizado** de toda la infraestructura de IA. Antes de trabajar en cualquier tarea, lee estos archivos para entender el estado actual:
-
-### Archivos Obligatorios (leer al inicio de cada sesión):
-1. **`INFRASTRUCTURE_MAP.md`** - Mapa maestro de toda la infraestructura (red, puertos, servicios, credenciales)
-2. **`MODEL_CATALOG.md`** - Catálogo completo de modelos instalados y planificados
-3. **`PROJECT_REGISTRY.md`** - Registry de proyectos y qué servicios AI usan
-4. **`SERVER_GPU_MAP.md`** - Detalle técnico del hardware y configuración del servidor
+Este repositorio (`IA-HUB-MADRID1`) contiene el **código** del AI Hub. La **documentación** está en `docs-centralized`. Los archivos `.md` que aún existen aquí (`INFRASTRUCTURE_MAP.md`, etc.) son copias legacy que se migraron al repo centralizado.
 
 ### AI Hub Gateway
 El componente principal es el **AI Hub Gateway** (`ai-hub-gateway/`), un FastAPI que actúa como API unificada compatible con OpenAI:
