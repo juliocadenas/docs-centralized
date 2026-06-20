@@ -41,14 +41,26 @@ async def get_status():
     gpu_info = await gpu_manager.get_gpu_info()
 
     uptime = time.time() - start_time
-    all_online = all(s["status"] == "online" for s in services_status if s["always_on"])
+    always_on_services = [s for s in services_status if s["always_on"]]
+    always_on_online = [s for s in always_on_services if s["status"] == "online"]
+    always_on_offline = [s["name"] for s in always_on_services if s["status"] != "online"]
+    all_online = len(always_on_offline) == 0
 
     return {
         "status": "ok" if all_online else "degraded",
         "gateway_version": GATEWAY_VERSION,
         "uptime_seconds": round(uptime, 1),
         "services": services_status,
+        "services_summary": {
+            "total": len(services_status),
+            "online": len([s for s in services_status if s["status"] == "online"]),
+            "offline": len([s for s in services_status if s["status"] == "offline"]),
+            "always_on_total": len(always_on_services),
+            "always_on_online": len(always_on_online),
+            "always_on_offline": always_on_offline,
+        },
         "gpu": gpu_info,
+        "gpu_queue_waiting": gpu_manager.gpu_queue_waiting if gpu_manager else 0,
         "timestamp": datetime.utcnow().isoformat(),
     }
 

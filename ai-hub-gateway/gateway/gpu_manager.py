@@ -5,6 +5,8 @@ Includes auto-unload of idle services to prevent VRAM exhaustion.
 """
 import asyncio
 import logging
+import os
+import shutil
 import subprocess
 import time
 from typing import Dict, List, Optional
@@ -129,12 +131,39 @@ class GPUManager:
     # GPU Info
     # ============================================================
 
+    def _find_nvidia_smi(self) -> Optional[str]:
+        """Find nvidia-smi binary, checking common paths."""
+        # Check PATH first
+        nvidia_smi = shutil.which("nvidia-smi")
+        if nvidia_smi:
+            return nvidia_smi
+        # Check common locations
+        for path in [
+            "/usr/bin/nvidia-smi",
+            "/usr/local/bin/nvidia-smi",
+            "/opt/cuda/bin/nvidia-smi",
+            "/usr/lib/wsl/lib/nvidia-smi",  # WSL
+        ]:
+            if os.path.exists(path):
+                return path
+        return None
+
     async def get_gpu_info(self) -> Dict:
         """Get current GPU information using nvidia-smi."""
         try:
+            nvidia_smi = self._find_nvidia_smi()
+            if not nvidia_smi:
+                logger.warning("nvidia-smi not found in PATH or common locations.")
+                return {
+                    "total_vram_mb": GPU_TOTAL_VRAM_MB,
+                    "used_vram_mb": None,
+                    "free_vram_mb": None,
+                    "error": "nvidia-smi not found",
+                }
+
             result = subprocess.run(
                 [
-                    "nvidia-smi",
+                    nvidia_smi,
                     "--query-gpu=name,memory.total,memory.used,memory.free,"
                     "utilization.gpu,temperature.gpu",
                     "--format=csv,noheader,nounits",
@@ -153,8 +182,6 @@ class GPUManager:
                     "gpu_utilization": float(parts[4]),
                     "temperature": float(parts[5]),
                 }
-        except FileNotFoundError:
-            logger.warning("nvidia-smi not found. GPU monitoring unavailable.")
         except subprocess.TimeoutExpired:
             logger.warning("nvidia-smi timed out.")
         except Exception as e:
