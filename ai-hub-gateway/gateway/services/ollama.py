@@ -82,7 +82,7 @@ class OllamaService:
                 "messages": messages,
                 "temperature": temperature,
                 "top_p": top_p,
-                "stream": False,
+                "stream": False,  # Non-streaming handled here; streaming in chat_completion_stream
             }
             if max_tokens:
                 payload["max_tokens"] = max_tokens
@@ -165,6 +165,83 @@ class OllamaService:
             }
         else:
             return {"error": f"Ollama returned HTTP {resp.status_code}: {resp.text}"}
+
+    async def chat_completion_stream(
+        self,
+        model: str,
+        messages: List[Dict],
+        temperature: float = 0.7,
+        top_p: float = 0.9,
+        max_tokens: Optional[int] = None,
+        stop: Optional[str] = None,
+    ) -> AsyncIterator[str]:
+        """
+        Stream chat completion tokens as Server-Sent Events (SSE).
+        
+        Yields OpenAI-compatible SSE chunks:
+        data: {"choices":[{"delta":{"content":"token"}}]}
+        """
+        chat_id = f"chatcmpl-{uuid.uuid4().hex[:12]}"
+        created = int(time.time())
+
+        payload = {
+            "model": model,
+            "messages": messages,
+            "temperature": temperature,
+            "top_p": top_p,
+            "stream": True,
+        }
+        if max_tokens:
+            payload["max_tokens"] = max_tokens
+        if stop:
+            payload["stop"] = stop if isinstance(stop, list) else [stop]
+
+        try:
+            async with self.client.stream(
+                "POST",
+                f"{self.base_url}/v1/chat/completions",
+                json=payload,
+                timeout=120.0,
+            ) as resp:
+                if resp.status_code != 200:
+                    body = await resp.aread()
+                    error_data = {
+                        "error": f"Ollama returned {resp.status_code}: {body.decode()[:200]}"
+                    }
+                    yield f"data: {__import__('json').dumps(error_data)}\n\n"
+                    yield "data: [DONE]\n\n"
+                    return
+
+                async for line in resp.aiter_lines():
+                    if not line or not line.startswith("data: "):
+                        continue
+                    data_str = line[6:]  # Remove "data: " prefix
+                    if data_str.strip() == "[DONE]":
+                        yield "data: [DONE]\n\n"
+                        return
+                    try:
+                        import json
+                        chunk = json.loads(data_str)
+                        # Re-wrap with our chat_id for consistency
+                        chunk["id"] = chat_id
+                        chunk["created"] = created
+                        yield f"data: {json.dumps(chunk)}\n\n"
+                    except Exception:
+                        continue
+
+            yield "data: [DONE]\n\n"
+
+        except httpx.ConnectError:
+            import json
+            error = {"error": "Ollama service is not available."}
+            yield f"data: {json.dumps(error)}\n\n"
+            yield "data: [DONE]\n\n"
+        except Exception as e:
+            import json
+            logger.error(f"Streaming error: {e}")
+            error = {"error": str(e)}
+            yield f"data: {json.dumps(error)}\n\n"
+            yield "data: [DONE]\n\n"
 
     async def close(self):
         """Close the HTTP client."""

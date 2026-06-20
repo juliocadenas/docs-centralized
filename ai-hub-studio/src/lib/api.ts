@@ -19,6 +19,8 @@ export interface HubStatus {
     vram_total_mb?: number;
     vram_used_mb?: number;
     vram_free_mb?: number;
+    temperature_c?: number;
+    utilization_pct?: number;
   };
 }
 
@@ -80,6 +82,71 @@ export async function chatCompletions(
   });
   if (!res.ok) throw new Error(`Chat error: ${res.status}`);
   return res.json();
+}
+
+/**
+ * Stream chat completion tokens from the Gateway (SSE).
+ * Calls onToken for each token chunk received.
+ * Returns the full accumulated text when done.
+ */
+export async function chatCompletionsStream(
+  messages: ChatMessage[],
+  onToken: (token: string, fullText: string) => void,
+  model = 'qwen2.5:7b',
+  options?: { temperature?: number; max_tokens?: number }
+): Promise<string> {
+  const res = await fetch(`${GATEWAY_URL}/chat/completions/stream`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model,
+      messages,
+      stream: true,
+      temperature: options?.temperature ?? 0.7,
+      max_tokens: options?.max_tokens ?? 4096,
+    }),
+  });
+
+  if (!res.ok) throw new Error(`Chat stream error: ${res.status}`);
+  if (!res.body) throw new Error('No response body for streaming');
+
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let fullText = '';
+  let buffer = '';
+
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split('\n');
+    buffer = lines.pop() || '';
+
+    for (const line of lines) {
+      if (!line.startsWith('data: ')) continue;
+      const dataStr = line.slice(6).trim();
+      if (dataStr === '[DONE]') continue;
+
+      try {
+        const chunk = JSON.parse(dataStr);
+        if (chunk.error) {
+          throw new Error(chunk.error);
+        }
+        const delta = chunk.choices?.[0]?.delta?.content;
+        if (delta) {
+          fullText += delta;
+          onToken(delta, fullText);
+        }
+      } catch (e) {
+        if (e instanceof Error && !e.message.includes('JSON')) {
+          throw e;
+        }
+      }
+    }
+  }
+
+  return fullText;
 }
 
 // Generate image

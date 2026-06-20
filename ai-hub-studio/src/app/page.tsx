@@ -61,11 +61,24 @@ const LLM_MODELS = [
   { id: 'llama3.1', name: 'Llama 3.1', desc: 'Rápido y versátil', icon: '🦙' },
 ];
 
-import { chatCompletions, getHubStatus } from '../lib/api';
+import { chatCompletions, chatCompletionsStream, getHubStatus } from '../lib/api';
 
 async function apiChat(messages: {role:string;content:string}[], model='qwen2.5:7b') {
   const res = await chatCompletions(messages as any, model);
   return res.choices?.[0]?.message?.content || 'Sin respuesta del modelo.';
+}
+
+// Stream version - calls onToken for each token received
+async function apiChatStream(
+  messages: {role:string;content:string}[],
+  onToken: (fullText: string) => void,
+  model='qwen2.5:7b'
+): Promise<string> {
+  return chatCompletionsStream(
+    messages as any,
+    (_token, fullText) => onToken(fullText),
+    model
+  );
 }
 
 // Check if Ollama LLM service is online
@@ -201,15 +214,95 @@ function Sidebar({ active, onSelect, collapsed, onToggle }: {
 }
 
 /* ── HOME ── */
+function GpuMetricBar({label, used, total, unit, color}: {label:string; used:number; total:number; unit:string; color:string}) {
+  const pct = total > 0 ? Math.round((used / total) * 100) : 0;
+  return (
+    <div>
+      <div className="flex justify-between items-baseline mb-1">
+        <span className="text-[11px] text-gray-500">{label}</span>
+        <span className="text-xs font-mono text-gray-300">{used}{unit} / {total}{unit}</span>
+      </div>
+      <div className="h-2 bg-white/5 rounded-full overflow-hidden">
+        <div className={`h-full ${color} rounded-full transition-all duration-700`} style={{width: `${pct}%`}}/>
+      </div>
+    </div>
+  );
+}
+
 function HomePage({ onSelect }: { onSelect:(id:string)=>void }) {
   const online = TOOLS.filter(t=>t.status==='online').length;
   const installing = TOOLS.filter(t=>t.status==='installing').length;
+  const [hubData, setHubData] = useState<any>(null);
+  const [loadingStatus, setLoadingStatus] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    const fetchData = async () => {
+      try {
+        const status = await getHubStatus();
+        if (mounted) { setHubData(status); setLoadingStatus(false); }
+      } catch { if (mounted) setLoadingStatus(false); }
+    };
+    fetchData();
+    const interval = setInterval(fetchData, 5000); // Refresh every 5s
+    return () => { mounted = false; clearInterval(interval); };
+  }, []);
+
+  const gpu = hubData?.gpu;
+  const services = hubData?.services;
+  const servicesArray = Array.isArray(services) ? services : Object.entries(services || {}).map(([k,v]:[string,any]) => ({name:k, ...v}));
+  const activeServices = servicesArray.filter((s:any) => s.status === 'online').length;
+
   return (
     <div className="p-8 max-w-6xl">
       <div className="mb-10">
         <h1 className="text-3xl font-black text-white mb-2">Bienvenido a AI Hub Madrid</h1>
         <p className="text-gray-400 text-sm">Tu estudio de creacion con IA — Videos, avatares, musica, imagenes. Todo local, zero tokens.</p>
       </div>
+
+      {/* GPU Live Dashboard */}
+      <div className="bg-gradient-to-br from-[#1a1a2e] to-[#16213e] border border-white/10 rounded-2xl p-6 mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-bold text-white flex items-center gap-2">
+            <span className="text-lg">🎮</span> GPU Status - RTX 5080
+            {loadingStatus && <span className="text-[10px] text-gray-500 animate-pulse ml-2">cargando...</span>}
+          </h2>
+          <span className={`text-[10px] px-2 py-1 rounded-full font-bold ${gpu?.available ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+            {gpu?.available ? '● ONLINE' : '● OFFLINE'}
+          </span>
+        </div>
+        {gpu?.available ? (
+          <div className="space-y-3">
+            <GpuMetricBar
+              label="VRAM"
+              used={Math.round((gpu.vram_used_mb || 0) / 1024)}
+              total={Math.round((gpu.vram_total_mb || 16384) / 1024)}
+              unit="GB"
+              color="bg-gradient-to-r from-emerald-500 to-teal-400"
+            />
+            {gpu.temperature_c !== undefined && (
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] text-gray-500">🌡️ Temperatura</span>
+                <span className={`text-xs font-mono font-bold ${gpu.temperature_c > 80 ? 'text-red-400' : gpu.temperature_c > 65 ? 'text-amber-400' : 'text-emerald-400'}`}>
+                  {gpu.temperature_c}°C
+                </span>
+              </div>
+            )}
+            {gpu.utilization_pct !== undefined && (
+              <GpuMetricBar
+                label="⚡ Uso GPU"
+                used={gpu.utilization_pct}
+                total={100}
+                unit="%"
+                color="bg-gradient-to-r from-blue-500 to-cyan-400"
+              />
+            )}
+          </div>
+        ) : (
+          <p className="text-xs text-gray-600 py-4 text-center">Servidor NAB9 no responde. Verificando conexión...</p>
+        )}
+      </div>
+
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4 mb-10">
         <div className="bg-white/[0.03] border border-white/5 rounded-xl p-5">
@@ -217,14 +310,30 @@ function HomePage({ onSelect }: { onSelect:(id:string)=>void }) {
           <div className="text-xs text-gray-500 mt-1">Herramientas activas</div>
         </div>
         <div className="bg-white/[0.03] border border-white/5 rounded-xl p-5">
-          <div className="text-3xl font-black text-amber-400">{installing}</div>
-          <div className="text-xs text-gray-500 mt-1">Instalando</div>
+          <div className="text-3xl font-black text-cyan-400">{activeServices || '-'}</div>
+          <div className="text-xs text-gray-500 mt-1">Servicios en GPU</div>
         </div>
         <div className="bg-white/[0.03] border border-white/5 rounded-xl p-5">
           <div className="text-3xl font-black text-gray-500">{TOOLS.filter(t=>t.status==='planned').length}</div>
           <div className="text-xs text-gray-500 mt-1">Planificadas</div>
         </div>
       </div>
+
+      {/* Services List */}
+      {servicesArray.length > 0 && (
+        <div className="mb-8">
+          <h2 className="text-lg font-bold text-white mb-4">Servicios del Hub</h2>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2">
+            {servicesArray.map((s:any) => (
+              <div key={s.name} className="flex items-center gap-2 bg-white/[0.02] border border-white/5 rounded-lg px-3 py-2">
+                <StatusDot status={s.status}/>
+                <span className="text-xs text-gray-300 capitalize truncate">{s.name}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Quick Access */}
       <h2 className="text-lg font-bold text-white mb-4">Acceso rapido</h2>
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -438,13 +547,29 @@ function ChatTool() {
     const allMsgs = [...messages, userMsg];
     setMessages(allMsgs);
     setInput(''); setLoading(true);
+
+    // Add empty assistant message that will be filled by streaming
+    setMessages(p=>[...p,{role:'assistant',content:''}]);
+
     try {
       // Send only last MAX_CONTEXT messages to avoid token limits
       const context = allMsgs.slice(-MAX_CONTEXT);
-      const c = await apiChat(context, selectedModel);
-      setMessages(p=>[...p,{role:'assistant',content:c}]);
+      await apiChatStream(context, (fullText) => {
+        // Update the last message (assistant) with streaming text
+        setMessages(prev => {
+          const updated = [...prev];
+          updated[updated.length - 1] = {role:'assistant', content: fullText};
+          return updated;
+        });
+        // Auto-scroll while streaming
+        if (ref.current) ref.current.scrollTop = ref.current.scrollHeight;
+      }, selectedModel);
     } catch(e: any) {
-      setMessages(p=>[...p,{role:'assistant',content:`❌ Error: ${e.message || 'No se pudo conectar con el servidor.'}`}]);
+      setMessages(prev => {
+        const updated = [...prev];
+        updated[updated.length - 1] = {role:'assistant', content:`❌ Error: ${e.message || 'No se pudo conectar con el servidor.'}`};
+        return updated;
+      });
     }
     setLoading(false);
     setTimeout(()=>ref.current?.scrollTo({top:ref.current.scrollHeight,behavior:'smooth'}),100);
@@ -506,7 +631,7 @@ function ChatTool() {
             </div>
           );
         })}
-        {loading && (
+        {loading && messages[messages.length-1]?.role === 'user' && (
           <div className="text-gray-500 text-sm animate-pulse flex items-center gap-2">
             <span>{activeModel?.icon}</span>
             <span>{activeModel?.name} pensando...</span>
@@ -515,6 +640,12 @@ function ChatTool() {
               <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay:'150ms'}}></span>
               <span className="w-1.5 h-1.5 bg-indigo-400 rounded-full animate-bounce" style={{animationDelay:'300ms'}}></span>
             </span>
+          </div>
+        )}
+        {loading && messages[messages.length-1]?.role === 'assistant' && messages[messages.length-1]?.content === '' && (
+          <div className="text-gray-500 text-sm animate-pulse flex items-center gap-2">
+            <span>{activeModel?.icon}</span>
+            <span>Iniciando stream...</span>
           </div>
         )}
       </div>

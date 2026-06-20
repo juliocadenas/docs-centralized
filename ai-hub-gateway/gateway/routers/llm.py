@@ -6,6 +6,7 @@ import logging
 from typing import List
 
 from fastapi import APIRouter, HTTPException
+from fastapi.responses import StreamingResponse
 
 from ..models.schemas import (
     ChatCompletionRequest,
@@ -60,3 +61,38 @@ async def create_chat_completion(request: ChatCompletionRequest):
         return result
 
     raise HTTPException(status_code=502, detail="Unexpected response from Ollama")
+
+
+@router.post("/chat/completions/stream")
+async def create_chat_completion_stream(request: ChatCompletionRequest):
+    """
+    Stream a chat completion via Server-Sent Events (SSE).
+    
+    Returns text/event-stream with OpenAI-compatible chunks.
+    The frontend can consume this with EventSource or fetch + ReadableStream.
+    """
+    if not ollama_service:
+        raise HTTPException(status_code=503, detail="LLM service not initialized")
+
+    if not request.stream:
+        # If client didn't request stream, redirect to non-stream endpoint
+        return await create_chat_completion(request)
+
+    messages = [{"role": m.role, "content": m.content} for m in request.messages]
+
+    return StreamingResponse(
+        ollama_service.chat_completion_stream(
+            model=request.model,
+            messages=messages,
+            temperature=request.temperature,
+            top_p=request.top_p,
+            max_tokens=request.max_tokens,
+            stop=request.stop,
+        ),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # Disable Nginx buffering
+        },
+    )
