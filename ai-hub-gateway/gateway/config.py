@@ -177,9 +177,9 @@ SERVICES = {
         "port": 8050,
         "type": "effects",
         "health_endpoint": "/",
-        "systemd_service": "effects",
-        "vram_mb": 500,
-        "always_on": True,
+        "systemd_service": "rembg",
+        "vram_mb": 0,  # CPU-only, no VRAM
+        "always_on": False,  # Lazy-load: start on demand
         "categories": ["effects", "image"],
     },
     "upscale": {
@@ -188,7 +188,7 @@ SERVICES = {
         "port": 8051,
         "type": "effects",
         "health_endpoint": "/",
-        "systemd_service": "effects",
+        "systemd_service": "upscale",
         "vram_mb": 500,
         "always_on": False,
         "categories": ["effects", "image"],
@@ -199,6 +199,7 @@ SERVICES = {
         "port": 8052,
         "type": "effects",
         "health_endpoint": "/",
+        "systemd_service": "higgsfield",
         "vram_mb": 2000,
         "always_on": False,
         "categories": ["effects", "video"],
