@@ -1,0 +1,20 @@
+[Unit]
+Description=PCIe/GPU Watchdog - Detect errors and recover
+After=network.target
+StartLimitIntervalSec=300
+StartLimitBurst=3
+
+[Service]
+Type=simple
+ExecStart=/usr/local/bin/pcie-watchdog.sh
+Restart=always
+RestartSec=30
+User=root
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=pcie-watchdog
+
+[Install]
+WantedBy=multi-user.target
