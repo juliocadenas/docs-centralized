@@ -63,7 +63,7 @@ const LLM_MODELS = [
 
 import { chatCompletions, getHubStatus } from '../lib/api';
 
-async function apiChat(messages: {role:string;content:string}[], model='llama3.1') {
+async function apiChat(messages: {role:string;content:string}[], model='qwen2.5:7b') {
   const res = await chatCompletions(messages as any, model);
   return res.choices?.[0]?.message?.content || 'Sin respuesta del modelo.';
 }
@@ -72,7 +72,11 @@ async function apiChat(messages: {role:string;content:string}[], model='llama3.1
 async function checkLLMStatus(): Promise<'online'|'offline'|'unknown'> {
   try {
     const status = await getHubStatus();
-    const llm = status.services?.ollama;
+    // services is an array from the Gateway API
+    const services = status.services as any;
+    const llm = Array.isArray(services)
+      ? services.find((s:any) => s.name === 'ollama')
+      : (services as any)?.ollama;
     return llm?.status === 'online' ? 'online' : 'offline';
   } catch { return 'unknown'; }
 }
