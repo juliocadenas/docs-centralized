@@ -66,15 +66,23 @@ async def list_models():
 
     # Add static model entries from other services
     static_models = [
+        # Image models
+        ModelInfo(id="sdxl", type="text-to-image", service="comfyui", vram_mb=6144, status="available"),
+        ModelInfo(id="flux", type="text-to-image", service="comfyui", vram_mb=8192, status="available"),
+        ModelInfo(id="sd15", type="text-to-image", service="comfyui", vram_mb=2048, status="available"),
         # Audio models
         ModelInfo(id="yue", type="text-to-music", service="documusic", vram_mb=8192, status="available"),
         ModelInfo(id="ace-step", type="text-to-music", service="documusic", vram_mb=4096, status="available"),
         ModelInfo(id="diffrhythm", type="text-to-music", service="documusic", vram_mb=4096, status="available"),
-        # Vision models
+        # Video models
         ModelInfo(id="wan2.1", type="text-to-video", service="wan2gp", vram_mb=6144, status="available"),
         ModelInfo(id="ltx-video", type="text-to-video", service="wan2gp", vram_mb=6144, status="available"),
         ModelInfo(id="hunyuan", type="text-to-video", service="comfyui", vram_mb=12288, status="available"),
-        ModelInfo(id="sd15", type="text-to-image", service="comfyui", vram_mb=2048, status="available"),
+        # TTS models
+        ModelInfo(id="piper", type="text-to-speech", service="piper_tts", vram_mb=0, status="available"),
+        ModelInfo(id="xtts-v2", type="text-to-speech", service="xtts_v2", vram_mb=3000, status="available"),
+        # STT models
+        ModelInfo(id="whisper", type="speech-to-text", service="whisper_stt", vram_mb=2000, status="available"),
     ]
     models.extend(static_models)
 
