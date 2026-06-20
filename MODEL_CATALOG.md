@@ -1,7 +1,7 @@
 # 📦 Catalogo de Modelos AI - Hub Madrid
 
 > Fuente de verdad para modelos disponibles y planificados.
-> Ultima actualizacion: 8 junio 2026
+> Ultima actualizacion: 19 junio 2026 (Qwen2.5 + Qwen2.5-Coder instalados + sincronizacion con estado real)
 
 ---
 
@@ -10,7 +10,12 @@
 ### LLM (Large Language Models)
 | Modelo | ID | Tipo | VRAM | Puerto | Estado |
 |--------|-----|------|------|--------|--------|
-| Llama 3.1 | `llama3.1` | Chat/Instruct | ~4GB | 11434 (Ollama) | ✅ Activo |
+| Llama 3.1 | `llama3.1` | Chat/Instruct | ~5GB | 11434 (Ollama) | ✅ Activo |
+| Qwen 2.5 7B | `qwen2.5:7b` | Chat/Instruct/Multilingue | ~5GB | 11434 (Ollama) | ✅ Activo (INSTALADO 19 jun 2026) |
+| Qwen 2.5 Coder 7B | `qwen2.5-coder:7b` | Programacion/Code | ~5GB | 11434 (Ollama) | ✅ Activo (INSTALADO 19 jun 2026) |
+
+> **Nota sobre Qwen 2.5:** Modelo de Alibaba, superior a Llama 3.1 en razonamiento, español y codigo.
+> Se puede usar via Gateway: `model="qwen2.5:7b"` o `model="qwen2.5-coder:7b"` (incluyendo el tag `:7b`)
 
 ### 🎭 Avatares & Lip-sync (INSTALADO 8 junio 2026)
 | Modelo | ID | Tipo | VRAM | Puerto | Path | Estado |
@@ -20,18 +25,24 @@
 | LivePortrait (KwaiVGI) | `liveportrait` | Animacion facial | ~4GB | 8044 | `/mnt/seagate/models/liveportrait/` | ✅ Activo |
 | MuseTalk (TME) | `musetalk` | Lip-sync tiempo real | ~4GB | 8040 | `/mnt/seagate/models/musetalk/` | ✅ Activo |
 
-### 🎬 Video Generation Avanzada (INSTALADO 8 junio 2026)
+### 🎬 Video Generation Avanzada
 | Modelo | ID | Tipo | VRAM | Puerto | Path | Estado |
 |--------|-----|------|------|--------|------|--------|
-| CogVideoX (THUDM) | `cogvideox` | Video HQ | ~12GB | 7861 | `/mnt/seagate/CogVideoX/` | 🟡 Instalando |
-| StoryDiffusion | `storydiffusion` | Comic→Video | ~6GB | 7862 | `/mnt/seagate/StoryDiffusion/` | 🟡 Instalando |
+| CogVideoX (THUDM) | `cogvideox` | Video HQ | ~12GB | 7861 | `/mnt/seagate/CogVideoX/` | ❌ Fallido (requiere re-instalar) |
+| StoryDiffusion | `storydiffusion` | Comic→Video | ~6GB | 7862 | `/mnt/seagate/StoryDiffusion/` | ❌ Fallido (requiere re-instalar) |
 
-### 🔧 Efectos & Edicion (INSTALADO 8 junio 2026)
+### 🎙️ Voz (TTS/STT) (VERIFICADO 19 junio 2026)
+| Modelo | ID | Tipo | VRAM | Puerto | Estado |
+|--------|-----|------|------|--------|--------|
+| Piper TTS | `piper_tts` | Text-to-Speech (CPU) | ~0GB | 8010 | ✅ Activo (always-on) |
+| Whisper STT | `whisper_stt` | Speech-to-Text | ~2GB | 8020 | ✅ Activo (always-on) |
+
+### 🔧 Efectos & Edicion (VERIFICADO 19 junio 2026)
 | Modelo | ID | Tipo | VRAM | Puerto | Path | Estado |
 |--------|-----|------|------|--------|------|--------|
-| Rembg | `rembg` | Quitar fondo | ~1GB | 8050 | `pip: rembg` | 🟡 Instalando |
-| Real-ESRGAN | `realesrgan` | Upscale 4x | ~4GB | 8051 | `pip: realesrgan` | 🟡 Instalando |
-| Higgsfield AI | `higgsfield` | Efectos video | ~4GB | 8052 | (planificado) | 🟡 Instalando |
+| Rembg | `rembg` | Quitar fondo | ~0.5GB | 8050 | `effects_svc` | ✅ Activo |
+| Real-ESRGAN | `realesrgan` | Upscale 4x | ~0.5GB | 8051 | `effects_svc` | ✅ Activo |
+| Higgsfield AI | `higgsfield` | Efectos video | ~2GB | 8052 | `effects_svc` | ✅ Activo |
 
 ### Audio / Musica
 | Modelo | ID | Tipo | VRAM | Puerto | Path |
@@ -63,9 +74,8 @@
 
 | Modelo | ID | Tipo | VRAM | Puerto | HuggingFace ID | Uso |
 |--------|-----|------|------|--------|----------------|-----|
-| XTTS-v2 | `xtts-v2` | TTS | ~3GB | 8010 | `coqui/XTTS-v2` | Text-to-Speech multilingue |
-| Whisper large-v3 | `whisper-v3` | STT | ~3GB | 8020 | `openai/whisper-large-v3` | Speech-to-Text |
-| Fish Speech | `fish-speech` | TTS | ~3GB | 8010 | `fishaudio/fish-speech-1.5` | TTS alternativo |
+| XTTS-v2 | `xtts-v2` | TTS con voice cloning | ~3GB | **8011** | `coqui/XTTS-v2` | TTS multilingue | 🔧 Docker listo |
+| Fish Speech | `fish-speech` | TTS natural | ~3GB | **8012** | `fishaudio/fish-speech-1.5` | TTS alternativo | 🔧 Docker listo |
 | Open-Sora | `open-sora` | Text-to-Video | ~10GB | 7863 | `hpcai-tech/Open-Sora` | Video generation tipo Sora (open source) |
 
 ### 🤖 Humanos Digitales & VTubers (Prioridad MEDIA)
@@ -100,8 +110,8 @@
 - Audio: 56GB
 - Vision: 49GB
 - Avatares (checkpoints): 28.9GB (Hallo2 13GB + LatentSync 7.5GB + LivePortrait 2GB + MuseTalk 6.4GB)
-- LLM: ~5GB
-- **Total: ~139GB de 1.8TB (7.5%)**
+- LLM: ~15GB (Llama 3.1 + Qwen 2.5 + Qwen 2.5 Coder)
+- **Total: ~149GB de 1.8TB (8.3%)**
 
 ### VRAM por Perfil
 | Perfil | Servicios | VRAM Total |

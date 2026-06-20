@@ -2,7 +2,7 @@
 
 > **⚠️ Este es el archivo maestro.** Cualquier agente de IA (Cline, Cursor, etc.) debe leer este archivo para entender la infraestructura completa. Se actualiza con cada cambio en la infraestructura.
 > 
-> **Última actualización:** 18 junio 2026 (v3.1 - Telegram alert bot + Effects service fix + all pipelines verified)
+> **Última actualización:** 19 junio 2026 (v3.2 - Qwen2.5 instalado + sincronizacion con estado real del gateway)
 
 ---
 
@@ -217,7 +217,9 @@ curl http://100.105.27.27:9000/v1/status
 ### LLM (Ollama)
 | Modelo | Tipo | VRAM | Endpoint |
 |--------|------|------|----------|
-| llama3.1 | Chat/Instruct | ~4GB | Gateway → Ollama :11434 |
+| llama3.1 | Chat/Instruct | ~5GB | Gateway → Ollama :11434 |
+| qwen2.5 | Chat/Multilingue | ~5GB | Gateway → Ollama :11434 |
+| qwen2.5-coder | Programacion/Code | ~5GB | Gateway → Ollama :11434 |
 
 ### Audio (DocuMusic)
 | Modelo | Tipo | VRAM | Endpoint |

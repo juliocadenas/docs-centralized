@@ -1,6 +1,7 @@
 """
 Voice Router - TTS and STT endpoints.
-Proxies to Piper TTS (:8010) and Whisper STT (:8020).
+Supports multiple TTS engines: Piper TTS, XTTS-v2, Fish Speech.
+Proxies to Whisper STT (:8020).
 OpenAI-compatible: /v1/audio/speech and /v1/audio/transcriptions
 """
 import logging
@@ -14,13 +15,39 @@ from ..models.schemas import SpeechRequest, TranscriptionResponse
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
+# TTS Engine URLs
 PIPER_TTS_URL = "http://localhost:8010"
+XTTS_V2_URL = "http://localhost:8011"  # XTTS-v2 (to be installed)
+FISH_SPEECH_URL = "http://localhost:8012"  # Fish Speech (to be installed)
+
+# STT URL
 WHISPER_STT_URL = "http://localhost:8020"
 
 
 @router.post("/audio/speech")
 async def create_speech(request: SpeechRequest):
-    """Generate speech from text (TTS). Proxies to Piper TTS on :8010."""
+    """
+    Generate speech from text (TTS).
+    Supports multiple engines via model param:
+    - 'piper' (default, CPU, fast)
+    - 'xtts' (XTTS-v2, GPU, voice cloning)
+    - 'fish' (Fish Speech, GPU, natural voice)
+
+    Routes to the appropriate TTS engine based on model.
+    """
+    model = (request.model or "piper").lower()
+
+    if model in ("xtts", "xtts-v2", "coqui"):
+        return await _tts_xtts(request)
+    elif model in ("fish", "fish-speech"):
+        return await _tts_fish(request)
+    else:
+        # Default: Piper TTS
+        return await _tts_piper(request)
+
+
+async def _tts_piper(request: SpeechRequest):
+    """Piper TTS - fast CPU-based TTS."""
     try:
         async with httpx.AsyncClient(timeout=30.0) as client:
             resp = await client.post(
@@ -43,9 +70,124 @@ async def create_speech(request: SpeechRequest):
 
     except httpx.ConnectError:
         raise HTTPException(status_code=503, detail="Piper TTS service not available (port 8010)")
+    except HTTPException:
+        raise
     except Exception as e:
-        logger.error(f"TTS error: {e}")
+        logger.error(f"Piper TTS error: {e}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+async def _tts_xtts(request: SpeechRequest):
+    """
+    XTTS-v2 - multilingual TTS with voice cloning capability.
+    Requires speaker_wav for voice cloning or uses default speaker.
+    """
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            payload = {
+                "text": request.input,
+                "language": request.language or "es",
+                "speaker_wav": request.speaker_wav or "default",
+                "temperature": 0.75,
+            }
+            resp = await client.post(
+                f"{XTTS_V2_URL}/api/tts",
+                json=payload,
+            )
+            if resp.status_code != 200:
+                # Fallback to Piper if XTTS not available
+                logger.warning(f"XTTS-v2 error {resp.status_code}, falling back to Piper")
+                return await _tts_piper(request)
+
+            audio_data = resp.content
+            media_type = "audio/wav"
+            if request.response_format == "mp3":
+                media_type = "audio/mpeg"
+
+            return Response(content=audio_data, media_type=media_type)
+
+    except httpx.ConnectError:
+        logger.warning("XTTS-v2 not available, falling back to Piper TTS")
+        return await _tts_piper(request)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"XTTS-v2 error: {e}, falling back to Piper")
+        return await _tts_piper(request)
+
+
+async def _tts_fish(request: SpeechRequest):
+    """
+    Fish Speech - natural sounding TTS alternative.
+    """
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            payload = {
+                "text": request.input,
+                "language": request.language or "es",
+                "voice": request.voice or "default",
+            }
+            resp = await client.post(
+                f"{FISH_SPEECH_URL}/api/tts",
+                json=payload,
+            )
+            if resp.status_code != 200:
+                logger.warning(f"Fish Speech error {resp.status_code}, falling back to Piper")
+                return await _tts_piper(request)
+
+            audio_data = resp.content
+            media_type = "audio/wav"
+            if request.response_format == "mp3":
+                media_type = "audio/mpeg"
+
+            return Response(content=audio_data, media_type=media_type)
+
+    except httpx.ConnectError:
+        logger.warning("Fish Speech not available, falling back to Piper TTS")
+        return await _tts_piper(request)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Fish Speech error: {e}, falling back to Piper")
+        return await _tts_piper(request)
+
+
+@router.get("/audio/voices")
+async def list_voices():
+    """
+    List available TTS voices across all engines.
+    """
+    voices = {"piper": [], "xtts": [], "fish": []}
+
+    async with httpx.AsyncClient(timeout=5.0) as client:
+        # Piper voices
+        try:
+            resp = await client.get(f"{PIPER_TTS_URL}/api/voices")
+            if resp.status_code == 200:
+                voices["piper"] = resp.json().get("voices", [])
+        except Exception:
+            pass
+
+        # XTTS voices (when available)
+        try:
+            resp = await client.get(f"{XTTS_V2_URL}/api/voices")
+            if resp.status_code == 200:
+                voices["xtts"] = resp.json().get("voices", [])
+        except Exception:
+            pass
+
+        # Fish Speech voices (when available)
+        try:
+            resp = await client.get(f"{FISH_SPEECH_URL}/api/voices")
+            if resp.status_code == 200:
+                voices["fish"] = resp.json().get("voices", [])
+        except Exception:
+            pass
+
+    return {
+        "engines": ["piper", "xtts", "fish"],
+        "voices": voices,
+    }
 
 
 @router.post("/audio/transcriptions", response_model=TranscriptionResponse)

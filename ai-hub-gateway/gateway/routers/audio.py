@@ -3,6 +3,7 @@ Audio Router - Audio/music generation endpoint.
 Proxies to DocuMusic service.
 """
 import logging
+import httpx
 
 from fastapi import APIRouter, HTTPException
 
@@ -49,16 +50,25 @@ async def create_audio(request: AudioGenerationRequest):
             prompt=request.prompt,
             lyrics=request.lyrics,
             tags=request.tags or "",
-            duration_seconds=request.duration_seconds or 30,
-            seed=request.seed or -1,
+            duration_seconds=request.duration_seconds if request.duration_seconds is not None else 30,
+            seed=request.seed if request.seed is not None else -1,
             steps=request.steps,
             cfg_scale=request.cfg_scale,
         )
+    except httpx.TimeoutException:
+        logger.error("DocuMusic timeout generating audio")
+        raise HTTPException(status_code=504, detail="Audio generation timed out. Try a shorter duration.")
+    except httpx.ConnectError:
+        logger.error("Cannot connect to DocuMusic service")
+        raise HTTPException(status_code=502, detail="DocuMusic service is not responding. It may be loading models.")
+    except Exception as e:
+        logger.error(f"Unexpected error in audio generation: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Audio generation failed: {str(e)}")
     finally:
         if gpu_manager:
             gpu_manager.release_gpu()
 
-    if "error" in result:
+    if isinstance(result, dict) and "error" in result:
         raise HTTPException(status_code=502, detail=result["error"])
 
     return result
@@ -69,5 +79,9 @@ async def get_audio_status(job_id: str):
     """Check the status of an audio generation job."""
     if not documusic_service:
         raise HTTPException(status_code=503, detail="Audio service not initialized")
-    result = await documusic_service.get_status(job_id)
+    try:
+        result = await documusic_service.get_status(job_id)
+    except Exception as e:
+        logger.error(f"Error checking audio status {job_id}: {e}", exc_info=True)
+        raise HTTPException(status_code=502, detail=f"Failed to check job status: {str(e)}")
     return result

@@ -198,13 +198,17 @@ class InfrastructureInfo(BaseModel):
 # OpenAI-compatible: /v1/audio/speech and /v1/audio/transcriptions
 # ============================================================
 class SpeechRequest(BaseModel):
-    """OpenAI-compatible TTS request."""
-    model: Optional[str] = "piper"
+    """OpenAI-compatible TTS request.
+    Supports multiple engines: piper (default), xtts, fish.
+    """
+    model: Optional[str] = "piper"  # piper, xtts, fish
     input: str
     voice: Optional[str] = "es_ES-davefx-medium"
     response_format: Optional[str] = "wav"  # wav, mp3
     speed: Optional[float] = 1.0
     language: Optional[str] = "es"
+    # XTTS-v2 voice cloning: path or URL to reference speaker audio
+    speaker_wav: Optional[str] = None
 
 
 class TranscriptionRequest(BaseModel):

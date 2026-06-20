@@ -10,6 +10,7 @@ A unified OpenAI-compatible API gateway that proxies to local AI services:
 All services run locally on the Madrid server (RTX 5080 16GB).
 Zero external API tokens required.
 """
+import os
 import logging
 from contextlib import asynccontextmanager
 
@@ -17,6 +18,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from gateway.config import GATEWAY_VERSION, GATEWAY_PORT
+
+# Allowed CORS origins - can be overridden via environment variable
+ALLOWED_ORIGINS = os.environ.get(
+    "GATEWAY_CORS_ORIGINS",
+    "*"  # Default: allow all (local network only)
+).split(",")
 from gateway.gpu_manager import GPUManager
 from gateway.routers import llm_router, images_router, audio_router, video_router, status_router, voice_router, avatar_router, effects_router
 from gateway.routers.llm import set_service as set_llm_service
@@ -112,10 +119,13 @@ app = FastAPI(
 )
 
 # CORS - Allow all origins for local network use
+# NOTE: allow_credentials=False is intentional when allow_origins=["*"].
+#       Browsers reject credentials with wildcard origins. If you need
+#       credentials (cookies), set GATEWAY_CORS_ORIGINS to specific origins.
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
+    allow_origins=ALLOWED_ORIGINS,
+    allow_credentials=(ALLOWED_ORIGINS != ["*"]),
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -146,10 +156,12 @@ async def root():
 
 if __name__ == "__main__":
     import uvicorn
+    # reload only in development; default to False for stability in production
+    DEV_MODE = os.environ.get("GATEWAY_DEV", "0") == "1"
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
         port=GATEWAY_PORT,
-        reload=True,
+        reload=DEV_MODE,
         log_level="info",
     )

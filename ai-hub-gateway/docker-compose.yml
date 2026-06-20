@@ -12,10 +12,54 @@ services:
       - COMFYUI_BASE_URL=http://host.docker.internal:8188
       - DOCUMUSIC_BASE_URL=http://host.docker.internal:7860
       - WAN2GP_BASE_URL=http://host.docker.internal:7861
+      - PIPER_TTS_URL=http://host.docker.internal:8010
+      - XTTS_V2_URL=http://localhost:8011
+      - FISH_SPEECH_URL=http://localhost:8012
+      - WHISPER_STT_URL=http://host.docker.internal:8020
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
     # GPU access for nvidia-smi monitoring
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # XTTS-v2 - Multilingual TTS with voice cloning
+  # Run separately: docker compose up xtts-v2
+  xtts-v2:
+    image: ghcr.io/coqui-ai/xtts-streaming-server:latest
+    container_name: xtts-v2
+    ports:
+      - "8011:80"
+    volumes:
+      - /mnt/seagate/models/voice/tts/xtts-v2:/root/.local/share/coqui
+    environment:
+      - COQUI_TOS_AGREED=1
+    restart: unless-stopped
+    profiles: ["voice", "full"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # Fish Speech - Natural voice TTS
+  # Run separately: docker compose --profile voice up fish-speech
+  fish-speech:
+    image: fishaudio/fish-speech:latest
+    container_name: fish-speech
+    ports:
+      - "8012:80"
+    volumes:
+      - /mnt/seagate/models/voice/tts/fish-speech:/app/models
+    restart: unless-stopped
+    profiles: ["voice", "full"]
     deploy:
       resources:
         reservations:

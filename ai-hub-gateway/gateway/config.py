@@ -24,6 +24,8 @@ COMFYUI_BASE_URL = os.getenv("COMFYUI_BASE_URL", "http://localhost:8188")
 DOCUMUSIC_BASE_URL = os.getenv("DOCUMUSIC_BASE_URL", "http://localhost:8000")
 WAN2GP_BASE_URL = os.getenv("WAN2GP_BASE_URL", "http://localhost:7860")
 PIPER_TTS_URL = os.getenv("PIPER_TTS_URL", "http://localhost:8010")
+XTTS_V2_URL = os.getenv("XTTS_V2_URL", "http://localhost:8011")  # NEW: XTTS-v2 TTS
+FISH_SPEECH_URL = os.getenv("FISH_SPEECH_URL", "http://localhost:8012")  # NEW: Fish Speech TTS
 WHISPER_STT_URL = os.getenv("WHISPER_STT_URL", "http://localhost:8020")
 MUSETALK_URL = os.getenv("MUSETALK_URL", "http://localhost:8040")
 LATENTSYNC_URL = os.getenv("LATENTSYNC_URL", "http://localhost:8043")
@@ -90,6 +92,28 @@ SERVICES = {
         "systemd_service": "tts",
         "vram_mb": 0,
         "always_on": True,
+        "categories": ["tts", "voice"],
+    },
+    "xtts_v2": {
+        "name": "XTTS-v2 (Voice Cloning)",
+        "base_url": XTTS_V2_URL,
+        "port": 8011,
+        "type": "tts",
+        "health_endpoint": "/",
+        "docker_compose": True,
+        "vram_mb": 3000,
+        "always_on": False,
+        "categories": ["tts", "voice"],
+    },
+    "fish_speech": {
+        "name": "Fish Speech TTS",
+        "base_url": FISH_SPEECH_URL,
+        "port": 8012,
+        "type": "tts",
+        "health_endpoint": "/",
+        "docker_compose": True,
+        "vram_mb": 3000,
+        "always_on": False,
         "categories": ["tts", "voice"],
     },
     "whisper_stt": {
