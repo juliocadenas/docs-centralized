@@ -1,9 +1,7 @@
-version: "3.8"
-
 services:
-  # ═══════════════════════════════════════════════════════════════
+  # ==============================================================
   # AI HUB GATEWAY - FastAPI principal (siempre activo)
-  # ═══════════════════════════════════════════════════════════════
+  # ==============================================================
   ai-hub-gateway:
     build: .
     container_name: ai-hub-gateway
@@ -24,9 +22,17 @@ services:
       - MUSETALK_URL=http://host.docker.internal:8040
       - LATENTSYNC_URL=http://host.docker.internal:8043
       - LIVEPORTRAIT_URL=http://host.docker.internal:8044
+      - HALLO2_URL=http://host.docker.internal:8070
+      - HIGGSFIELD_URL=http://host.docker.internal:8052
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/v1/status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     # GPU access for nvidia-smi monitoring
     deploy:
       resources:
@@ -36,10 +42,10 @@ services:
               count: all
               capabilities: [gpu]
 
-  # ═══════════════════════════════════════════════════════════════
+  # ==============================================================
   # VOICE - TTS y STT
   # Activar: docker compose --profile voice up -d
-  # ═══════════════════════════════════════════════════════════════
+  # ==============================================================
 
   # Piper TTS - Fast CPU-based TTS (siempre activo, consume ~200MB RAM)
   piper-tts:
@@ -56,6 +62,11 @@ services:
       --voice es_ES-davefx-medium
       --data-dir /data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "nc", "-z", "localhost", "10200"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
     profiles: ["voice", "full"]
 
   # XTTS-v2 - Multilingual TTS with voice cloning (GPU)
@@ -112,6 +123,12 @@ services:
       - WHISPER_MODEL=large-v3
       - WHISPER_DEVICE=cuda
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
     profiles: ["voice", "full"]
     deploy:
       resources:
@@ -121,10 +138,10 @@ services:
               count: all
               capabilities: [gpu]
 
-  # ═══════════════════════════════════════════════════════════════
+  # ==============================================================
   # EFFECTS - Background removal y Upscale
   # Activar: docker compose --profile effects up -d
-  # ═══════════════════════════════════════════════════════════════
+  # ==============================================================
 
   # Rembg - Background removal (CPU, ligero)
   rembg:
@@ -145,6 +162,12 @@ services:
     ports:
       - "8051:8000"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
     profiles: ["effects", "full"]
     deploy:
       resources:
@@ -154,10 +177,10 @@ services:
               count: all
               capabilities: [gpu]
 
-  # ═══════════════════════════════════════════════════════════════
+  # ==============================================================
   # AVATAR - Lip-sync, Portrait Animation
   # Activar: docker compose --profile avatar up -d
-  # ═══════════════════════════════════════════════════════════════
+  # ==============================================================
 
   # MuseTalk - Real-time lip-sync (GPU)
   musetalk:
@@ -169,6 +192,7 @@ services:
       - "8040:7860"
     volumes:
       - /mnt/seagate/models/avatar/musetalk:/models
+    shm_size: "4gb"
     restart: unless-stopped
     profiles: ["avatar", "full"]
     deploy:
@@ -189,6 +213,7 @@ services:
       - "8044:7860"
     volumes:
       - /mnt/seagate/models/avatar/liveportrait:/models
+    shm_size: "4gb"
     restart: unless-stopped
     profiles: ["avatar", "full"]
     deploy:
