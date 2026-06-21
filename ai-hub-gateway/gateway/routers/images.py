@@ -3,6 +3,7 @@ Images Router - OpenAI-compatible image generation endpoint.
 Proxies to ComfyUI service.
 """
 import logging
+import httpx
 
 from fastapi import APIRouter, HTTPException
 
@@ -37,12 +38,18 @@ async def create_image(request: ImageGenerationRequest):
     if not comfyui_service:
         raise HTTPException(status_code=503, detail="Image service not initialized")
 
-    # Mark service as used (resets idle timer)
+    # Mark service as used + acquire GPU lock safely
+    gpu_acquired = False
     if gpu_manager:
-        await gpu_manager.start_service("comfyui")  # Ensures it's running, starts if needed
-        gpu_manager.mark_service_used("comfyui")
-        # Acquire GPU lock - prevents OOM from concurrent GPU jobs
-        await gpu_manager.acquire_gpu()
+        try:
+            await gpu_manager.start_service("comfyui")
+            gpu_manager.mark_service_used("comfyui")
+            await gpu_manager.acquire_gpu()
+            gpu_acquired = True
+        except Exception as e:
+            logger.error(f"Failed to acquire GPU for image gen: {e}")
+            raise HTTPException(status_code=503, detail=f"GPU unavailable: {str(e)}")
+
     try:
         # Parse size string (e.g., "1024x1024")
         width, height = 1024, 1024
@@ -62,11 +69,20 @@ async def create_image(request: ImageGenerationRequest):
             scheduler=request.scheduler or "normal",
             model=request.model or "sd15",
         )
+    except httpx.TimeoutException:
+        logger.error("ComfyUI timeout generating image")
+        raise HTTPException(status_code=504, detail="Image generation timed out. Try fewer steps.")
+    except httpx.ConnectError:
+        logger.error("Cannot connect to ComfyUI service")
+        raise HTTPException(status_code=502, detail="ComfyUI service is not responding. It may be loading models.")
+    except Exception as e:
+        logger.error(f"Unexpected error in image generation: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Image generation failed: {str(e)}")
     finally:
-        if gpu_manager:
+        if gpu_manager and gpu_acquired:
             await gpu_manager.release_gpu()
 
-    if "error" in result:
+    if isinstance(result, dict) and "error" in result:
         raise HTTPException(status_code=502, detail=result["error"])
 
     return result
@@ -78,5 +94,9 @@ async def get_image_status(prompt_id: str):
     if not comfyui_service:
         raise HTTPException(status_code=503, detail="Image service not initialized")
 
-    result = await comfyui_service.get_prompt_status(prompt_id)
+    try:
+        result = await comfyui_service.get_prompt_status(prompt_id)
+    except Exception as e:
+        logger.error(f"Error checking image status {prompt_id}: {e}")
+        raise HTTPException(status_code=502, detail=f"Failed to check status: {str(e)}")
     return result
