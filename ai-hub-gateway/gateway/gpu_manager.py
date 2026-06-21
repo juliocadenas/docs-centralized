@@ -349,15 +349,20 @@ class GPUManager:
             return {"status": "unknown", "error": str(e)}
 
     async def _check_docker_service(self, service_name: str) -> Dict:
-        """Check if a Docker container is running."""
+        """Check if a Docker container is running AND responding on HTTP."""
         try:
             result = subprocess.run(
                 ["docker", "ps", "--filter", f"name={service_name}", "--format", "{{.Status}}"],
                 capture_output=True, text=True, timeout=10,
             )
-            if result.stdout.strip():
-                return {"status": "online"}
-            return {"status": "offline"}
+            if not result.stdout.strip():
+                return {"status": "offline"}
+
+            # Container is running - also verify HTTP health if we have a URL
+            service = SERVICES.get(service_name)
+            if service and service.get("base_url"):
+                return await self._check_http_health(service)
+            return {"status": "online"}
         except Exception:
             return {"status": "unknown"}
 

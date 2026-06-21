@@ -177,7 +177,7 @@ SERVICES = {
         "port": 8050,
         "type": "effects",
         "health_endpoint": "/",
-        "systemd_service": "rembg",
+        "docker_compose": True,
         "vram_mb": 0,  # CPU-only, no VRAM
         "always_on": False,  # Lazy-load: start on demand
         "categories": ["effects", "image"],
