@@ -6,27 +6,49 @@
 const GATEWAY_URL = process.env.NEXT_PUBLIC_GATEWAY_URL || 'http://100.105.27.27:9000/v1';
 
 export interface ServiceStatus {
-  status: string;
-  models?: string[];
+  name: string;
+  display_name: string;
+  status: 'online' | 'offline' | 'unknown' | 'error';
+  url: string;
+  port: number;
+  type: string;
+  categories: string[];
+  vram_mb: number;
+  always_on: boolean;
+  idle_seconds?: number;
+  response_time_ms?: number;
+  error?: string;
 }
 
 export interface HubStatus {
-  status: string;
-  services: Record<string, ServiceStatus>;
-  gpu: {
-    available: boolean;
-    name?: string;
-    vram_total_mb?: number;
-    vram_used_mb?: number;
-    vram_free_mb?: number;
-    temperature_c?: number;
-    utilization_pct?: number;
+  status: 'ok' | 'degraded';
+  gateway_version: string;
+  uptime_seconds: number;
+  services: ServiceStatus[];
+  services_summary: {
+    total: number;
+    online: number;
+    offline: number;
+    always_on_total: number;
+    always_on_online: number;
+    always_on_offline: string[];
   };
+  gpu: {
+    gpu_name?: string;
+    total_vram_mb: number;
+    used_vram_mb?: number;
+    free_vram_mb?: number;
+    gpu_utilization?: number;
+    temperature?: number;
+    error?: string;
+  };
+  gpu_queue_waiting: number;
 }
 
 export interface ChatMessage {
   role: 'system' | 'user' | 'assistant';
   content: string;
+  name?: string;
 }
 
 export interface ChatResponse {
@@ -35,6 +57,11 @@ export interface ChatResponse {
     message: ChatMessage;
     finish_reason: string;
   }>;
+  usage?: {
+    prompt_tokens: number;
+    completion_tokens: number;
+    total_tokens: number;
+  };
 }
 
 export interface ImageGenResponse {
@@ -48,6 +75,10 @@ export interface ModelInfo {
   id: string;
   object: string;
   owned_by: string;
+  type?: string;
+  service?: string;
+  vram_mb?: number;
+  status?: string;
 }
 
 // Fetch hub status
@@ -383,4 +414,74 @@ export async function upscaleImage(params: {
   });
   if (!res.ok) throw new Error(`Upscale error: ${res.status}`);
   return res.blob(); // Returns image binary
+}
+
+// === Embeddings (text vectors) ===
+export async function createEmbeddings(
+  input: string,
+  model = 'nomic-embed-text'
+): Promise<{ data: Array<{ embedding: number[] }> }> {
+  const res = await fetch(`${GATEWAY_URL}/embeddings`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model, input }),
+  });
+  if (!res.ok) throw new Error(`Embeddings error: ${res.status}`);
+  return res.json();
+}
+
+// === Vision (image analysis) ===
+export async function analyzeImage(params: {
+  image_url: string;
+  prompt?: string;
+  model?: string; // 'qwen2.5vl:7b'
+}): Promise<ChatResponse> {
+  const res = await fetch(`${GATEWAY_URL}/chat/vision`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      image_url: params.image_url,
+      prompt: params.prompt || 'Describe esta imagen en detalle.',
+      model: params.model || 'qwen2.5vl:7b',
+    }),
+  });
+  if (!res.ok) throw new Error(`Vision error: ${res.status}`);
+  return res.json();
+}
+
+// === Warm model (pre-load into VRAM) ===
+export async function warmModel(model: string): Promise<{ status: string; model: string }> {
+  const res = await fetch(`${GATEWAY_URL}/models/warm`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ model }),
+  });
+  if (!res.ok) throw new Error(`Warm model error: ${res.status}`);
+  return res.json();
+}
+
+// === Fast health check ===
+export async function healthCheck(): Promise<{
+  status: string;
+  version: string;
+  uptime_seconds: number;
+}> {
+  const res = await fetch(`${GATEWAY_URL}/health`);
+  if (!res.ok) throw new Error('Gateway not responding');
+  return res.json();
+}
+
+// === Infrastructure info ===
+export async function getInfrastructure(): Promise<{
+  gateway: Record<string, unknown>;
+  server: Record<string, unknown>;
+  services: ServiceStatus[];
+  gpu: Record<string, unknown>;
+  storage: Record<string, unknown>;
+  network: Record<string, unknown>;
+  models_count: number;
+}> {
+  const res = await fetch(`${GATEWAY_URL}/infrastructure`);
+  if (!res.ok) throw new Error('Cannot fetch infrastructure info');
+  return res.json();
 }
