@@ -3,6 +3,7 @@ LLM Router - OpenAI-compatible chat completions endpoint.
 Proxies to Ollama service.
 """
 import logging
+from typing import Any
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
@@ -29,7 +30,7 @@ def set_service(service: OllamaService):
 class EmbeddingRequest(BaseModel):
     """OpenAI-compatible embeddings request."""
     model: str = "nomic-embed-text"
-    input: str
+    input: Any  # Accept str or list[str] (OpenAI compatible)
 
 
 class WarmModelRequest(BaseModel):
@@ -150,9 +151,12 @@ async def create_embeddings(request: EmbeddingRequest):
     if not ollama_service:
         raise HTTPException(status_code=503, detail="LLM service not initialized")
 
+    # Normalize input to list (OpenAI accepts string or list[str])
+    texts = request.input if isinstance(request.input, list) else [request.input]
+
     result = await ollama_service.embeddings(
         model=request.model,
-        input=request.input,
+        input=texts,
     )
 
     if "error" in result:
@@ -188,7 +192,8 @@ async def analyze_image(request: VisionRequest):
     Sends the image URL and prompt to the vision model.
     Works with Ollama's multimodal chat endpoint.
     """
-    import httpx as _httpx
+    if not ollama_service:
+        raise HTTPException(status_code=503, detail="LLM service not initialized")
 
     messages = [{
         "role": "user",
@@ -196,10 +201,14 @@ async def analyze_image(request: VisionRequest):
         "images": [request.image_url],
     }]
 
-    result = await ollama_service.chat_completion(
-        model=request.model,
-        messages=messages,
-    )
+    try:
+        result = await ollama_service.chat_completion(
+            model=request.model,
+            messages=messages,
+        )
+    except Exception as e:
+        logger.error(f"Vision analysis error: {e}")
+        raise HTTPException(status_code=502, detail=f"Vision model error: {str(e)}")
 
     if "error" in result:
         raise HTTPException(status_code=502, detail=result["error"])
