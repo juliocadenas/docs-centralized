@@ -54,10 +54,27 @@ def main():
     print("\n📦 Copiando archivos del Gateway...")
     for f in FILES_TO_COPY:
         if os.path.exists(f):
-            run(f"scp -o StrictHostKeyChecking=no {f} {SERVER}:{REMOTE_PATH}/gateway/")
+            # Determinar destino: routers van a /gateway/routers/
+            if "/routers/" in f:
+                dest = f"{REMOTE_PATH}/gateway/routers/"
+            else:
+                dest = f"{REMOTE_PATH}/gateway/"
+            run(f"scp -o StrictHostKeyChecking=no {f} {SERVER}:{dest}")
             print(f"   ✅ {f}")
         else:
             print(f"   ⚠️  {f} no encontrado, saltando...")
+
+    # 2b. Copiar docker-compose.yml + servicios Docker
+    print("\n🐳 Copiando docker-compose.yml y servicios Docker...")
+    if os.path.exists("ai-hub-gateway/docker-compose.yml"):
+        run(f"scp -o StrictHostKeyChecking=no ai-hub-gateway/docker-compose.yml {SERVER}:{REMOTE_PATH}/")
+        print("   ✅ docker-compose.yml")
+
+    # Copiar toda la carpeta services/
+    if os.path.exists("ai-hub-gateway/services"):
+        run(f"ssh {SERVER} 'mkdir -p {REMOTE_PATH}/services'")
+        run(f"scp -r -o StrictHostKeyChecking=no ai-hub-gateway/services/* {SERVER}:{REMOTE_PATH}/services/")
+        print("   ✅ services/ (Dockerfiles + apps)")
 
     # 3. Reiniciar Gateway
     print("\n🔄 Reiniciando AI Hub Gateway...")
