@@ -1,7 +1,9 @@
 # AI Hub Madrid - .gitignore
 
-# Temporary debug/fix scripts (archived)
+# Temporary debug/fix scripts
 _archive/
+_*.py
+_pack.py
 
 # Python
 __pycache__/
@@ -40,7 +42,6 @@ desktop.ini
 # Output files
 output/
 input/
-output/
 *.wav
 *.mp4
 *.mp3
@@ -58,9 +59,11 @@ output/
 
 # Logs
 *.log
-logs/"ai-hub-studio/"  
-"# Temp deploy files"  
-"_deploy_ssh.py"  
-"_deploy_on_server.sh"  
-"ai-hub-changes.bundle"  
-"*.bundle" 
+logs/
+
+# Temp deploy files
+_deploy_ssh.py
+_deploy_on_server.sh
+ai-hub-changes.bundle
+*.bundle
+ai-hub-deploy.tar.gz
