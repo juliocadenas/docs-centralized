@@ -141,7 +141,7 @@ class ComfyUIService:
 
                     return {
                         "prompt_id": prompt_id,
-                        "status": "completed" if status.get("completed", False) else "processing",
+                        "status": "completed" if status.get("completed", False) or status.get("status_str") == "success" else "processing",
                         "images": images,
                     }
                 return {"prompt_id": prompt_id, "status": "not_found"}
