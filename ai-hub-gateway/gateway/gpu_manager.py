@@ -24,6 +24,13 @@ IDLE_TIMEOUT_SECONDS = 600  # 10 minutes
 # How often the watchdog runs
 WATCHDOG_INTERVAL_SECONDS = 60
 
+# NOTE: Password is now read from env var, not hardcoded
+# Configure passwordless sudo via /etc/sudoers.d/ai-hub-gateway instead
+SUDO_PASSWORD = os.getenv("SUDO_PASSWORD", "")  # Empty = use passwordless sudo
+
+# Docker compose directory (configurable)
+DOCKER_COMPOSE_DIR = os.getenv("DOCKER_COMPOSE_DIR", "/mnt/seagate/ai-hub-gateway")
+
 
 class GPUManager:
     """
@@ -41,7 +48,7 @@ class GPUManager:
         self._queue_waiting = 0
 
     # ============================================================
-    # GPU Job Semaphore (prevents concurrent GPU jobs → OOM)
+    # GPU Job Semaphore (prevents concurrent GPU jobs -> OOM)
     # ============================================================
 
     async def acquire_gpu(self):
@@ -355,22 +362,30 @@ class GPUManager:
             return {"status": "unknown"}
 
     # ============================================================
-    # Systemd Start/Stop (using sudo -S for passwordless terminal)
+    # Systemd Start/Stop (passwordless sudo or SUDO_PASSWORD env var)
     # ============================================================
 
+    def _build_sudo_cmd(self, base_cmd: List[str]) -> tuple:
+        """Build sudo command. Returns (cmd_list, stdin_data)."""
+        if SUDO_PASSWORD:
+            return (["sudo", "-S"] + base_cmd, SUDO_PASSWORD + "\n")
+        return (["sudo"] + base_cmd, None)
+
     async def _start_systemd_service(self, systemd_name: str, display_name: str) -> Dict:
-        """Start a systemd service."""
+        """Start a systemd service. Uses passwordless sudo or SUDO_PASSWORD env var."""
         try:
+            # Try direct first (if running as root or systemd user)
             result = subprocess.run(
                 ["systemctl", "start", systemd_name],
                 capture_output=True, text=True, timeout=30,
             )
             if result.returncode == 0:
                 return {"status": "started", "message": f"{display_name} started successfully"}
-            # Try with sudo -S if direct fails
+            # Try with sudo
+            cmd, stdin_data = self._build_sudo_cmd(["systemctl", "start", systemd_name])
             result = subprocess.run(
-                ["sudo", "-S", "systemctl", "start", systemd_name],
-                input="pepe1234\n", capture_output=True, text=True, timeout=30,
+                cmd,
+                input=stdin_data, capture_output=True, text=True, timeout=30,
             )
             if result.returncode == 0:
                 return {"status": "started", "message": f"{display_name} started successfully"}
@@ -379,18 +394,20 @@ class GPUManager:
             return {"error": str(e)}
 
     async def _stop_systemd_service(self, systemd_name: str, display_name: str) -> Dict:
-        """Stop a systemd service."""
+        """Stop a systemd service. Uses passwordless sudo or SUDO_PASSWORD env var."""
         try:
+            # Try direct first
             result = subprocess.run(
                 ["systemctl", "stop", systemd_name],
                 capture_output=True, text=True, timeout=30,
             )
             if result.returncode == 0:
                 return {"status": "stopped", "message": f"{display_name} stopped. VRAM freed."}
-            # Try with sudo -S
+            # Try with sudo
+            cmd, stdin_data = self._build_sudo_cmd(["systemctl", "stop", systemd_name])
             result = subprocess.run(
-                ["sudo", "-S", "systemctl", "stop", systemd_name],
-                input="pepe1234\n", capture_output=True, text=True, timeout=30,
+                cmd,
+                input=stdin_data, capture_output=True, text=True, timeout=30,
             )
             if result.returncode == 0:
                 return {"status": "stopped", "message": f"{display_name} stopped. VRAM freed."}
@@ -398,13 +415,17 @@ class GPUManager:
         except Exception as e:
             return {"error": str(e)}
 
+    # ============================================================
+    # Docker Start/Stop (Docker Compose)
+    # ============================================================
+
     async def _start_docker_service(self, service_name: str, display_name: str) -> Dict:
         """Start a Docker Compose service."""
         try:
             result = subprocess.run(
                 ["docker", "compose", "up", "-d", service_name],
                 capture_output=True, text=True, timeout=60,
-                cwd="/mnt/seagate/ai-hub-gateway",
+                cwd=DOCKER_COMPOSE_DIR,
             )
             if result.returncode == 0:
                 return {"status": "started", "message": f"{display_name} started successfully"}
@@ -418,7 +439,7 @@ class GPUManager:
             result = subprocess.run(
                 ["docker", "compose", "stop", service_name],
                 capture_output=True, text=True, timeout=60,
-                cwd="/mnt/seagate/ai-hub-gateway",
+                cwd=DOCKER_COMPOSE_DIR,
             )
             if result.returncode == 0:
                 return {"status": "stopped", "message": f"{display_name} stopped. VRAM freed."}
