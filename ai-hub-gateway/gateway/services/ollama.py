@@ -2,7 +2,6 @@
 Ollama Service Connector.
 Proxies chat completion requests to Ollama, converting to OpenAI format.
 """
-import asyncio
 import logging
 import time
 import uuid
@@ -20,7 +19,10 @@ class OllamaService:
 
     def __init__(self, base_url: str = OLLAMA_BASE_URL):
         self.base_url = base_url.rstrip("/")
-        self.client = httpx.AsyncClient(timeout=120.0)
+        # 300s timeout: allows model loading (cold start) on first request
+        self.client = httpx.AsyncClient(timeout=300.0)
+        # Track which models have been loaded (warm cache)
+        self._loaded_models: set = set()
 
     async def health_check(self) -> Dict:
         """Check if Ollama is running and return status."""
@@ -59,6 +61,44 @@ class OllamaService:
             logger.error(f"Failed to list Ollama models: {e}")
             return []
 
+    async def warm_model(self, model: str) -> Dict:
+        """Pre-load a model into VRAM by sending a tiny request."""
+        try:
+            payload = {
+                "model": model,
+                "messages": [{"role": "user", "content": "hi"}],
+                "max_tokens": 1,
+                "stream": False,
+            }
+            resp = await self.client.post(
+                f"{self.base_url}/v1/chat/completions",
+                json=payload,
+                timeout=300.0,
+            )
+            if resp.status_code == 200:
+                self._loaded_models.add(model)
+                logger.info("Model '%s' warmed up successfully", model)
+                return {"status": "warmed", "model": model}
+            return {"error": f"HTTP {resp.status_code}"}
+        except Exception as e:
+            logger.error("Warm-up error for %s: %s", model, e)
+            return {"error": str(e)}
+
+    async def embeddings(self, model: str, input: str) -> Dict:
+        """Generate embeddings (OpenAI-compatible /v1/embeddings)."""
+        try:
+            payload = {"model": model, "input": input}
+            resp = await self.client.post(
+                f"{self.base_url}/v1/embeddings",
+                json=payload,
+                timeout=60.0,
+            )
+            if resp.status_code == 200:
+                return resp.json()
+            return {"error": f"HTTP {resp.status_code}: {resp.text[:200]}"}
+        except Exception as e:
+            return {"error": str(e)}
+
     async def chat_completion(
         self,
         model: str,
@@ -71,21 +111,14 @@ class OllamaService:
         options: Optional[Dict] = None,
         tools: Optional[List[Dict]] = None,
     ) -> Dict:
-        """
-        Send a chat completion request to Ollama and return OpenAI-formatted response.
-        
-        Ollama has its own /api/chat endpoint, but we also support /v1/chat/completions
-        which Ollama natively supports in newer versions.
-        """
+        """Send a chat completion request to Ollama (OpenAI-compatible)."""
         try:
-            # Build payload - prefer options dict if provided (more flexible)
             if options:
                 payload = {
                     "model": model,
                     "messages": messages,
                     "stream": False,
                 }
-                # Map common options to OpenAI format
                 if "temperature" in options:
                     payload["temperature"] = options["temperature"]
                 if "top_p" in options:
@@ -113,24 +146,22 @@ class OllamaService:
                 if stop:
                     payload["stop"] = stop if isinstance(stop, list) else [stop]
 
-            # Add tools (function calling) if provided
             if tools:
                 payload["tools"] = tools
 
             resp = await self.client.post(
                 f"{self.base_url}/v1/chat/completions",
                 json=payload,
-                timeout=120.0,
+                timeout=300.0,
             )
 
             if resp.status_code == 200:
-                # Ollama's OpenAI-compatible endpoint returns the right format
+                self._loaded_models.add(model)
                 return resp.json()
             else:
-                # Fallback to Ollama native API
                 logger.warning(
-                    f"Ollama OpenAI endpoint returned {resp.status_code}, "
-                    f"falling back to native API"
+                    "Ollama OpenAI endpoint returned %d, falling back to native API",
+                    resp.status_code,
                 )
                 return await self._native_chat(model, messages, temperature, top_p)
 
@@ -140,7 +171,7 @@ class OllamaService:
                          "Please ensure Ollama is running on the server."
             }
         except Exception as e:
-            logger.error(f"Chat completion error: {e}")
+            logger.error("Chat completion error: %s", e)
             return {"error": str(e)}
 
     async def _native_chat(
@@ -162,12 +193,11 @@ class OllamaService:
         resp = await self.client.post(
             f"{self.base_url}/api/chat",
             json=payload,
-            timeout=120.0,
+            timeout=300.0,
         )
 
         if resp.status_code == 200:
             data = resp.json()
-            # Convert Ollama native format to OpenAI format
             return {
                 "id": f"chatcmpl-{uuid.uuid4().hex[:12]}",
                 "object": "chat.completion",
@@ -204,12 +234,9 @@ class OllamaService:
         stop: Optional[str] = None,
         options: Optional[Dict] = None,
     ) -> AsyncIterator[str]:
-        """
-        Stream chat completion tokens as Server-Sent Events (SSE).
-        
-        Yields OpenAI-compatible SSE chunks:
-        data: {"choices":[{"delta":{"content":"token"}}]}
-        """
+        """Stream chat completion tokens as Server-Sent Events (SSE)."""
+        import json
+
         chat_id = f"chatcmpl-{uuid.uuid4().hex[:12]}"
         created = int(time.time())
 
@@ -247,28 +274,26 @@ class OllamaService:
                 "POST",
                 f"{self.base_url}/v1/chat/completions",
                 json=payload,
-                timeout=120.0,
+                timeout=300.0,
             ) as resp:
                 if resp.status_code != 200:
                     body = await resp.aread()
                     error_data = {
                         "error": f"Ollama returned {resp.status_code}: {body.decode()[:200]}"
                     }
-                    yield f"data: {__import__('json').dumps(error_data)}\n\n"
+                    yield f"data: {json.dumps(error_data)}\n\n"
                     yield "data: [DONE]\n\n"
                     return
 
                 async for line in resp.aiter_lines():
                     if not line or not line.startswith("data: "):
                         continue
-                    data_str = line[6:]  # Remove "data: " prefix
+                    data_str = line[6:]
                     if data_str.strip() == "[DONE]":
                         yield "data: [DONE]\n\n"
                         return
                     try:
-                        import json
                         chunk = json.loads(data_str)
-                        # Re-wrap with our chat_id for consistency
                         chunk["id"] = chat_id
                         chunk["created"] = created
                         yield f"data: {json.dumps(chunk)}\n\n"
@@ -278,13 +303,11 @@ class OllamaService:
             yield "data: [DONE]\n\n"
 
         except httpx.ConnectError:
-            import json
             error = {"error": "Ollama service is not available."}
             yield f"data: {json.dumps(error)}\n\n"
             yield "data: [DONE]\n\n"
         except Exception as e:
-            import json
-            logger.error(f"Streaming error: {e}")
+            logger.error("Streaming error: %s", e)
             error = {"error": str(e)}
             yield f"data: {json.dumps(error)}\n\n"
             yield "data: [DONE]\n\n"

@@ -3,17 +3,14 @@ LLM Router - OpenAI-compatible chat completions endpoint.
 Proxies to Ollama service.
 """
 import logging
-from typing import List
 
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
 from ..models.schemas import (
     ChatCompletionRequest,
     ChatCompletionResponse,
-    ChatCompletionChoice,
-    ChatMessage,
-    UsageInfo,
 )
 from ..services.ollama import OllamaService
 
@@ -29,21 +26,19 @@ def set_service(service: OllamaService):
     ollama_service = service
 
 
-@router.post("/chat/completions", response_model=ChatCompletionResponse)
-async def create_chat_completion(request: ChatCompletionRequest):
-    """
-    Create a chat completion (OpenAI-compatible).
-    
-    Proxies the request to Ollama and returns in OpenAI format.
-    Compatible with the OpenAI Python client library.
-    """
-    if not ollama_service:
-        raise HTTPException(status_code=503, detail="LLM service not initialized")
+class EmbeddingRequest(BaseModel):
+    """OpenAI-compatible embeddings request."""
+    model: str = "nomic-embed-text"
+    input: str
 
-    # Convert messages to dict format
-    messages = [{"role": m.role, "content": m.content} for m in request.messages]
 
-    # Build options dict for Ollama (supports seed, penalties, etc.)
+class WarmModelRequest(BaseModel):
+    """Request to pre-load a model into VRAM."""
+    model: str
+
+
+def _build_options(request: ChatCompletionRequest) -> dict:
+    """Build options dict from request fields."""
     options = {}
     if request.temperature is not None:
         options["temperature"] = request.temperature
@@ -59,6 +54,23 @@ async def create_chat_completion(request: ChatCompletionRequest):
         options["frequency_penalty"] = request.frequency_penalty
     if request.presence_penalty is not None:
         options["presence_penalty"] = request.presence_penalty
+    return options
+
+
+@router.post("/chat/completions", response_model=ChatCompletionResponse)
+async def create_chat_completion(request: ChatCompletionRequest):
+    """
+    Create a chat completion (OpenAI-compatible).
+    
+    Proxies the request to Ollama and returns in OpenAI format.
+    Compatible with the OpenAI Python client library.
+    """
+    if not ollama_service:
+        raise HTTPException(status_code=503, detail="LLM service not initialized")
+
+    messages = [{"role": m.role, "content": m.content} for m in request.messages]
+
+    options = _build_options(request)
 
     # Handle JSON mode
     if request.response_format and request.response_format.get("type") == "json_object":
@@ -78,7 +90,6 @@ async def create_chat_completion(request: ChatCompletionRequest):
     if "error" in result:
         raise HTTPException(status_code=502, detail=result["error"])
 
-    # If Ollama returned OpenAI format directly, pass through
     if "choices" in result:
         return result
 
@@ -97,23 +108,10 @@ async def create_chat_completion_stream(request: ChatCompletionRequest):
         raise HTTPException(status_code=503, detail="LLM service not initialized")
 
     if not request.stream:
-        # If client didn't request stream, redirect to non-stream endpoint
         return await create_chat_completion(request)
 
     messages = [{"role": m.role, "content": m.content} for m in request.messages]
-
-    # Build options
-    options = {}
-    if request.temperature is not None:
-        options["temperature"] = request.temperature
-    if request.top_p is not None:
-        options["top_p"] = request.top_p
-    if request.max_tokens is not None:
-        options["num_predict"] = request.max_tokens
-    if request.seed is not None:
-        options["seed"] = request.seed
-    if request.stop is not None:
-        options["stop"] = request.stop
+    options = _build_options(request)
 
     return StreamingResponse(
         ollama_service.chat_completion_stream(
@@ -125,6 +123,46 @@ async def create_chat_completion_stream(request: ChatCompletionRequest):
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",  # Disable Nginx buffering
+            "X-Accel-Buffering": "no",
         },
     )
+
+
+@router.post("/embeddings")
+async def create_embeddings(request: EmbeddingRequest):
+    """
+    Generate embeddings (OpenAI-compatible /v1/embeddings).
+    
+    Requires an embedding model in Ollama (e.g. nomic-embed-text).
+    """
+    if not ollama_service:
+        raise HTTPException(status_code=503, detail="LLM service not initialized")
+
+    result = await ollama_service.embeddings(
+        model=request.model,
+        input=request.input,
+    )
+
+    if "error" in result:
+        raise HTTPException(status_code=502, detail=result["error"])
+
+    return result
+
+
+@router.post("/models/warm")
+async def warm_model(request: WarmModelRequest):
+    """
+    Pre-load a model into VRAM (warm-up).
+    
+    Sends a tiny request so the model is loaded before the user uses it.
+    Reduces first-request latency significantly.
+    """
+    if not ollama_service:
+        raise HTTPException(status_code=503, detail="LLM service not initialized")
+
+    result = await ollama_service.warm_model(request.model)
+
+    if "error" in result:
+        raise HTTPException(status_code=502, detail=result["error"])
+
+    return result
