@@ -68,6 +68,8 @@ class OllamaService:
         max_tokens: Optional[int] = None,
         stream: bool = False,
         stop: Optional[str] = None,
+        options: Optional[Dict] = None,
+        tools: Optional[List[Dict]] = None,
     ) -> Dict:
         """
         Send a chat completion request to Ollama and return OpenAI-formatted response.
@@ -76,18 +78,44 @@ class OllamaService:
         which Ollama natively supports in newer versions.
         """
         try:
-            # Try Ollama's OpenAI-compatible endpoint first
-            payload = {
-                "model": model,
-                "messages": messages,
-                "temperature": temperature,
-                "top_p": top_p,
-                "stream": False,  # Non-streaming handled here; streaming in chat_completion_stream
-            }
-            if max_tokens:
-                payload["max_tokens"] = max_tokens
-            if stop:
-                payload["stop"] = stop if isinstance(stop, list) else [stop]
+            # Build payload - prefer options dict if provided (more flexible)
+            if options:
+                payload = {
+                    "model": model,
+                    "messages": messages,
+                    "stream": False,
+                }
+                # Map common options to OpenAI format
+                if "temperature" in options:
+                    payload["temperature"] = options["temperature"]
+                if "top_p" in options:
+                    payload["top_p"] = options["top_p"]
+                if "num_predict" in options:
+                    payload["max_tokens"] = options["num_predict"]
+                if "stop" in options:
+                    payload["stop"] = options["stop"] if isinstance(options["stop"], list) else [options["stop"]]
+                if "seed" in options:
+                    payload["seed"] = options["seed"]
+                if "frequency_penalty" in options:
+                    payload["frequency_penalty"] = options["frequency_penalty"]
+                if "presence_penalty" in options:
+                    payload["presence_penalty"] = options["presence_penalty"]
+            else:
+                payload = {
+                    "model": model,
+                    "messages": messages,
+                    "temperature": temperature,
+                    "top_p": top_p,
+                    "stream": False,
+                }
+                if max_tokens:
+                    payload["max_tokens"] = max_tokens
+                if stop:
+                    payload["stop"] = stop if isinstance(stop, list) else [stop]
+
+            # Add tools (function calling) if provided
+            if tools:
+                payload["tools"] = tools
 
             resp = await self.client.post(
                 f"{self.base_url}/v1/chat/completions",
@@ -174,6 +202,7 @@ class OllamaService:
         top_p: float = 0.9,
         max_tokens: Optional[int] = None,
         stop: Optional[str] = None,
+        options: Optional[Dict] = None,
     ) -> AsyncIterator[str]:
         """
         Stream chat completion tokens as Server-Sent Events (SSE).
@@ -184,17 +213,34 @@ class OllamaService:
         chat_id = f"chatcmpl-{uuid.uuid4().hex[:12]}"
         created = int(time.time())
 
-        payload = {
-            "model": model,
-            "messages": messages,
-            "temperature": temperature,
-            "top_p": top_p,
-            "stream": True,
-        }
-        if max_tokens:
-            payload["max_tokens"] = max_tokens
-        if stop:
-            payload["stop"] = stop if isinstance(stop, list) else [stop]
+        if options:
+            payload = {
+                "model": model,
+                "messages": messages,
+                "stream": True,
+            }
+            if "temperature" in options:
+                payload["temperature"] = options["temperature"]
+            if "top_p" in options:
+                payload["top_p"] = options["top_p"]
+            if "num_predict" in options:
+                payload["max_tokens"] = options["num_predict"]
+            if "stop" in options:
+                payload["stop"] = options["stop"] if isinstance(options["stop"], list) else [options["stop"]]
+            if "seed" in options:
+                payload["seed"] = options["seed"]
+        else:
+            payload = {
+                "model": model,
+                "messages": messages,
+                "temperature": temperature,
+                "top_p": top_p,
+                "stream": True,
+            }
+            if max_tokens:
+                payload["max_tokens"] = max_tokens
+            if stop:
+                payload["stop"] = stop if isinstance(stop, list) else [stop]
 
         try:
             async with self.client.stream(

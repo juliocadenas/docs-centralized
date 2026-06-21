@@ -19,7 +19,7 @@ class ChatMessage(BaseModel):
 
 
 class ChatCompletionRequest(BaseModel):
-    model: str = "llama3.1"
+    model: str = "qwen2.5:7b"
     messages: List[ChatMessage]
     temperature: Optional[float] = 0.7
     top_p: Optional[float] = 0.9
@@ -28,6 +28,12 @@ class ChatCompletionRequest(BaseModel):
     stop: Optional[Union[str, List[str]]] = None
     frequency_penalty: Optional[float] = 0.0
     presence_penalty: Optional[float] = 0.0
+    # OpenAI extensions (passed through to Ollama where supported)
+    seed: Optional[int] = None
+    tools: Optional[List[Dict[str, Any]]] = None
+    tool_choice: Optional[Any] = None
+    response_format: Optional[Dict[str, Any]] = None  # {"type": "json_object"}
+    n: Optional[int] = 1
 
 
 class UsageInfo(BaseModel):

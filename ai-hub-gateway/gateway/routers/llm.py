@@ -43,14 +43,36 @@ async def create_chat_completion(request: ChatCompletionRequest):
     # Convert messages to dict format
     messages = [{"role": m.role, "content": m.content} for m in request.messages]
 
+    # Build options dict for Ollama (supports seed, penalties, etc.)
+    options = {}
+    if request.temperature is not None:
+        options["temperature"] = request.temperature
+    if request.top_p is not None:
+        options["top_p"] = request.top_p
+    if request.max_tokens is not None:
+        options["num_predict"] = request.max_tokens
+    if request.seed is not None:
+        options["seed"] = request.seed
+    if request.stop is not None:
+        options["stop"] = request.stop
+    if request.frequency_penalty is not None:
+        options["frequency_penalty"] = request.frequency_penalty
+    if request.presence_penalty is not None:
+        options["presence_penalty"] = request.presence_penalty
+
+    # Handle JSON mode
+    if request.response_format and request.response_format.get("type") == "json_object":
+        messages.insert(0, {
+            "role": "system",
+            "content": "You must respond with valid JSON only. No markdown, no code fences.",
+        })
+
     result = await ollama_service.chat_completion(
         model=request.model,
         messages=messages,
-        temperature=request.temperature,
-        top_p=request.top_p,
-        max_tokens=request.max_tokens,
+        options=options if options else None,
         stream=request.stream,
-        stop=request.stop,
+        tools=request.tools,
     )
 
     if "error" in result:
@@ -80,14 +102,24 @@ async def create_chat_completion_stream(request: ChatCompletionRequest):
 
     messages = [{"role": m.role, "content": m.content} for m in request.messages]
 
+    # Build options
+    options = {}
+    if request.temperature is not None:
+        options["temperature"] = request.temperature
+    if request.top_p is not None:
+        options["top_p"] = request.top_p
+    if request.max_tokens is not None:
+        options["num_predict"] = request.max_tokens
+    if request.seed is not None:
+        options["seed"] = request.seed
+    if request.stop is not None:
+        options["stop"] = request.stop
+
     return StreamingResponse(
         ollama_service.chat_completion_stream(
             model=request.model,
             messages=messages,
-            temperature=request.temperature,
-            top_p=request.top_p,
-            max_tokens=request.max_tokens,
-            stop=request.stop,
+            options=options if options else None,
         ),
         media_type="text/event-stream",
         headers={
