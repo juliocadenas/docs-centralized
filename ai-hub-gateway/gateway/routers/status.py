@@ -93,8 +93,16 @@ async def list_models():
         # TTS models
         ModelInfo(id="piper", type="text-to-speech", service="piper_tts", vram_mb=0, status="available"),
         ModelInfo(id="xtts-v2", type="text-to-speech", service="xtts_v2", vram_mb=3000, status="available"),
+        ModelInfo(id="fish-speech", type="text-to-speech", service="fish_speech", vram_mb=3000, status="available"),
         # STT models
         ModelInfo(id="whisper", type="speech-to-text", service="whisper_stt", vram_mb=2000, status="available"),
+        # Avatar models
+        ModelInfo(id="musetalk", type="lip-sync", service="musetalk", vram_mb=4000, status="available"),
+        ModelInfo(id="latentsync", type="lip-sync", service="latentsync", vram_mb=4000, status="available"),
+        ModelInfo(id="liveportrait", type="portrait-animation", service="liveportrait", vram_mb=4000, status="available"),
+        # Effects models
+        ModelInfo(id="rembg", type="remove-background", service="rembg", vram_mb=0, status="available"),
+        ModelInfo(id="real-esrgan", type="upscale", service="upscale", vram_mb=2000, status="available"),
     ]
     models.extend(static_models)
 
@@ -167,5 +175,13 @@ async def _get_all_model_ids() -> list:
     if ollama_service:
         ollama_models = await ollama_service.list_models()
         models.extend(ollama_models)
-    models.extend(["yue", "ace-step", "diffrhythm", "wan2.1", "ltx-video", "hunyuan", "sd15"])
+    models.extend([
+        "sdxl", "flux", "sd15",
+        "yue", "ace-step", "diffrhythm",
+        "wan2.1", "ltx-video", "hunyuan",
+        "piper", "xtts-v2", "fish-speech",
+        "whisper",
+        "musetalk", "latentsync", "liveportrait",
+        "rembg", "real-esrgan",
+    ])
     return models
