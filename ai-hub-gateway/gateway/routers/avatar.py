@@ -42,8 +42,17 @@ async def create_lipsync(request: LipSyncRequest):
     service_url = MUSETALK_URL if request.model == "musetalk" else LATENTSYNC_URL
 
     # Acquire GPU lock - prevents OOM from concurrent GPU jobs
+    gpu_acquired = False
     if gpu_manager:
-        await gpu_manager.acquire_gpu()
+        try:
+            await gpu_manager.acquire_gpu()
+            gpu_acquired = True
+        except Exception as e:
+            logger.error(f"Failed to acquire GPU for lipsync: {e}")
+            return LipSyncResponse(
+                id=task_id, created=created, model=request.model,
+                status="error: GPU unavailable"
+            )
     try:
         async with httpx.AsyncClient(timeout=300.0) as client:
             resp = await client.post(
@@ -83,7 +92,7 @@ async def create_lipsync(request: LipSyncRequest):
             status=f"error: {str(e)}"
         )
     finally:
-        if gpu_manager:
+        if gpu_manager and gpu_acquired:
             await gpu_manager.release_gpu()
 
 
@@ -94,8 +103,17 @@ async def create_portrait_animation(request: PortraitAnimationRequest):
     created = int(time.time())
 
     # Acquire GPU lock - prevents OOM from concurrent GPU jobs
+    gpu_acquired = False
     if gpu_manager:
-        await gpu_manager.acquire_gpu()
+        try:
+            await gpu_manager.acquire_gpu()
+            gpu_acquired = True
+        except Exception as e:
+            logger.error(f"Failed to acquire GPU for portrait: {e}")
+            return PortraitAnimationResponse(
+                id=task_id, created=created,
+                status="error: GPU unavailable"
+            )
     try:
         async with httpx.AsyncClient(timeout=300.0) as client:
             resp = await client.post(
@@ -131,7 +149,7 @@ async def create_portrait_animation(request: PortraitAnimationRequest):
             id=task_id, created=created, status=f"error: {str(e)}"
         )
     finally:
-        if gpu_manager:
+        if gpu_manager and gpu_acquired:
             await gpu_manager.release_gpu()
 
 

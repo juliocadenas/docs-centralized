@@ -3,6 +3,7 @@ Video Router - Video generation endpoint.
 Proxies to Wan2GP service.
 """
 import logging
+import httpx
 
 from fastapi import APIRouter, HTTPException
 
@@ -38,11 +39,18 @@ async def create_video(request: VideoGenerationRequest):
         raise HTTPException(status_code=503, detail="Video service not initialized")
 
     # Ensure service is running and mark as used
+    gpu_acquired = False
     if gpu_manager:
-        await gpu_manager.start_service("wan2gp")
-        gpu_manager.mark_service_used("wan2gp")
-        # Acquire GPU lock - prevents OOM from concurrent GPU jobs
-        await gpu_manager.acquire_gpu()
+        try:
+            await gpu_manager.start_service("wan2gp")
+            gpu_manager.mark_service_used("wan2gp")
+            # Acquire GPU lock - prevents OOM from concurrent GPU jobs
+            await gpu_manager.acquire_gpu()
+            gpu_acquired = True
+        except Exception as e:
+            logger.error(f"Failed to acquire GPU for video: {e}")
+            raise HTTPException(status_code=503, detail=f"GPU unavailable: {str(e)}")
+
     try:
         result = await wan2gp_service.generate_video(
             prompt=request.prompt,
@@ -57,11 +65,20 @@ async def create_video(request: VideoGenerationRequest):
             sampler=request.sampler,
             scheduler=request.scheduler,
         )
+    except httpx.TimeoutException:
+        logger.error("Wan2GP timeout generating video")
+        raise HTTPException(status_code=504, detail="Video generation timed out. Try fewer frames or steps.")
+    except httpx.ConnectError:
+        logger.error("Cannot connect to Wan2GP service")
+        raise HTTPException(status_code=502, detail="Wan2GP service is not responding. It may be loading models.")
+    except Exception as e:
+        logger.error(f"Unexpected error in video generation: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Video generation failed: {str(e)}")
     finally:
-        if gpu_manager:
+        if gpu_manager and gpu_acquired:
             await gpu_manager.release_gpu()
 
-    if "error" in result:
+    if isinstance(result, dict) and "error" in result:
         raise HTTPException(status_code=502, detail=result["error"])
 
     return result

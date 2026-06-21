@@ -39,11 +39,17 @@ async def create_audio(request: AudioGenerationRequest):
         raise HTTPException(status_code=503, detail="Audio service not initialized")
 
     # Ensure service is running and mark as used
+    gpu_acquired = False
     if gpu_manager:
-        await gpu_manager.start_service("documusic")
-        gpu_manager.mark_service_used("documusic")
-        # Acquire GPU lock - prevents OOM from concurrent GPU jobs
-        await gpu_manager.acquire_gpu()
+        try:
+            await gpu_manager.start_service("documusic")
+            gpu_manager.mark_service_used("documusic")
+            # Acquire GPU lock - prevents OOM from concurrent GPU jobs
+            await gpu_manager.acquire_gpu()
+            gpu_acquired = True
+        except Exception as e:
+            logger.error(f"Failed to acquire GPU for audio: {e}")
+            raise HTTPException(status_code=503, detail=f"GPU unavailable: {str(e)}")
     try:
         result = await documusic_service.generate_audio(
             model=request.model or "ace-step",
@@ -65,7 +71,7 @@ async def create_audio(request: AudioGenerationRequest):
         logger.error(f"Unexpected error in audio generation: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"Audio generation failed: {str(e)}")
     finally:
-        if gpu_manager:
+        if gpu_manager and gpu_acquired:
             await gpu_manager.release_gpu()
 
     if isinstance(result, dict) and "error" in result:
