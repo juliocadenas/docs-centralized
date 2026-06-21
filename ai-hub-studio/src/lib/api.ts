@@ -294,8 +294,9 @@ export async function lipsyncVideo(params: {
 
 // === Avatar / Portrait Animation ===
 export async function animatePortrait(params: {
-  image_url: string;
-  motion?: string;
+  source_image_url: string;
+  driving_video_url: string;
+  relative_motion?: boolean;
   model?: string; // 'liveportrait'
 }): Promise<{ video_url: string; model: string }> {
   const res = await fetch(`${GATEWAY_URL}/avatar/portrait`, {
@@ -331,28 +332,55 @@ export async function createDigitalHuman(params: {
 }
 
 // === Effects: Remove Background ===
+// Backend expects multipart/form-data with 'file' or 'image_url'
 export async function removeBackground(params: {
-  image_url: string;
-}): Promise<{ image_url: string }> {
+  file?: File;
+  image_url?: string;
+  return_mask?: boolean;
+}): Promise<Blob> {
+  const formData = new FormData();
+  if (params.file) {
+    formData.append('file', params.file);
+  } else if (params.image_url) {
+    formData.append('image_url', params.image_url);
+  } else {
+    throw new Error('Provide file or image_url');
+  }
+  if (params.return_mask) {
+    formData.append('return_mask', 'true');
+  }
+
   const res = await fetch(`${GATEWAY_URL}/effects/remove-bg`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(params),
+    body: formData,
   });
   if (!res.ok) throw new Error(`Remove bg error: ${res.status}`);
-  return res.json();
+  return res.blob(); // Returns image binary
 }
 
 // === Effects: Upscale ===
+// Backend expects multipart/form-data with 'file' or 'image_url'
 export async function upscaleImage(params: {
-  image_url: string;
+  file?: File;
+  image_url?: string;
   scale?: number; // 2, 4
-}): Promise<{ image_url: string }> {
+}): Promise<Blob> {
+  const formData = new FormData();
+  if (params.file) {
+    formData.append('file', params.file);
+  } else if (params.image_url) {
+    formData.append('image_url', params.image_url);
+  } else {
+    throw new Error('Provide file or image_url');
+  }
+  if (params.scale) {
+    formData.append('scale', params.scale.toString());
+  }
+
   const res = await fetch(`${GATEWAY_URL}/effects/upscale`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(params),
+    body: formData,
   });
   if (!res.ok) throw new Error(`Upscale error: ${res.status}`);
-  return res.json();
+  return res.blob(); // Returns image binary
 }

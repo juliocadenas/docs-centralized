@@ -114,6 +114,11 @@ async def create_portrait_animation(request: PortraitAnimationRequest):
             return PortraitAnimationResponse(
                 id=task_id, created=created, status="processing"
             )
+    except httpx.ConnectError:
+        return PortraitAnimationResponse(
+            id=task_id, created=created,
+            status="error: LivePortrait service not available (port 8044)"
+        )
     except Exception as e:
         logger.error(f"Portrait animation error: {e}")
         return PortraitAnimationResponse(
