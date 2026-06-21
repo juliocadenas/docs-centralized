@@ -111,6 +111,7 @@ app = FastAPI(
         "- `POST /v1/effects/remove-bg` - Background Removal (Rembg)\n"
         "- `POST /v1/effects/upscale` - Image Upscale (Real-ESRGAN)\n"
         "- `GET /v1/models` - List All Models\n"
+        "- `GET /v1/health` - Fast Health Check (for Docker/cron)\n"
         "- `GET /v1/status` - System Status\n"
         "- `GET /v1/infrastructure` - Infrastructure Map\n"
         "- `POST /v1/services/{name}/start` - Start Service\n"

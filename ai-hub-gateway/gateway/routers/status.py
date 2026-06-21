@@ -1,10 +1,11 @@
 """
 Status Router - System status, models list, service management, and infrastructure info.
 """
+import asyncio
 import logging
 import time
 from datetime import datetime
-from typing import Dict
+from typing import Dict, List
 
 from fastapi import APIRouter, HTTPException
 
@@ -27,11 +28,26 @@ gpu_manager: GPUManager = None
 ollama_service: OllamaService = None
 start_time: float = time.time()
 
+# Cache: Ollama models list (refreshed every 60s to avoid hammering /api/tags)
+_models_cache: List[Dict] = []
+_models_cache_time: float = 0
+_MODELS_CACHE_TTL = 60
+
 
 def set_dependencies(gpu_mgr: GPUManager, ollama_svc: OllamaService):
     global gpu_manager, ollama_service
     gpu_manager = gpu_mgr
     ollama_service = ollama_svc
+
+
+@router.get("/health")
+async def health_check():
+    """Fast health check - no service checks, just gateway alive. For Docker/k8s/cron."""
+    return {
+        "status": "healthy",
+        "version": GATEWAY_VERSION,
+        "uptime_seconds": round(time.time() - start_time, 1),
+    }
 
 
 @router.get("/status")

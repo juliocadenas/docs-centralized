@@ -218,10 +218,20 @@ class GPUManager:
         return await self._check_http_health(service)
 
     async def get_all_services_status(self) -> List[Dict]:
-        """Get status of all registered services."""
+        """Get status of all registered services (checks in parallel for speed)."""
+        names = list(SERVICES.keys())
+
+        # Run all health checks concurrently (much faster than sequential)
+        healths = await asyncio.gather(
+            *[self.get_service_status(name) for name in names],
+            return_exceptions=True,
+        )
+
         statuses = []
-        for name, service in SERVICES.items():
-            health = await self.get_service_status(name)
+        for name, health in zip(names, healths):
+            service = SERVICES[name]
+            if isinstance(health, Exception):
+                health = {"status": "error", "error": str(health)[:100]}
             idle_secs = self.get_idle_seconds(name) if health.get("status") == "online" else None
             statuses.append({
                 "name": name,
