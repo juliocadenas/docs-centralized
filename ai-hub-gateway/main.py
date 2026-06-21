@@ -95,7 +95,11 @@ app = FastAPI(
     description=(
         "Unified OpenAI-compatible API for all local AI services.\n\n"
         "## Supported Endpoints\n"
-        "- `POST /v1/chat/completions` - LLM Chat (Ollama)\n"
+        "- `POST /v1/chat/completions` - LLM Chat (Ollama, supports vision + tools)\n"
+        "- `POST /v1/chat/completions/stream` - Streaming LLM Chat (SSE)\n"
+        "- `POST /v1/chat/vision` - Image Analysis (Qwen2.5-VL)\n"
+        "- `POST /v1/embeddings` - Text Embeddings (nomic-embed-text)\n"
+        "- `POST /v1/models/warm` - Pre-load Model into VRAM\n"
         "- `POST /v1/images/generations` - Image Generation (ComfyUI)\n"
         "- `POST /v1/audio/generations` - Audio/Music Generation (DocuMusic)\n"
         "- `POST /v1/audio/speech` - Text-to-Speech (Piper TTS)\n"
