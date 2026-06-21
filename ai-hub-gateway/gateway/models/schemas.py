@@ -14,7 +14,8 @@ from pydantic import BaseModel, Field
 # ============================================================
 class ChatMessage(BaseModel):
     role: str
-    content: str
+    # Support both string content and multimodal list (vision)
+    content: Union[str, List[Dict[str, Any]]]
     name: Optional[str] = None
 
 

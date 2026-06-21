@@ -37,6 +37,13 @@ class WarmModelRequest(BaseModel):
     model: str
 
 
+class VisionRequest(BaseModel):
+    """Analyze an image with a vision LLM."""
+    model: str = "qwen2.5vl:7b"
+    image_url: str
+    prompt: str = "Describe esta imagen en detalle."
+
+
 def _build_options(request: ChatCompletionRequest) -> dict:
     """Build options dict from request fields."""
     options = {}
@@ -68,7 +75,12 @@ async def create_chat_completion(request: ChatCompletionRequest):
     if not ollama_service:
         raise HTTPException(status_code=503, detail="LLM service not initialized")
 
-    messages = [{"role": m.role, "content": m.content} for m in request.messages]
+    messages = []
+    for m in request.messages:
+        msg = {"role": m.role, "content": m.content}
+        if m.name:
+            msg["name"] = m.name
+        messages.append(msg)
 
     options = _build_options(request)
 
@@ -161,6 +173,33 @@ async def warm_model(request: WarmModelRequest):
         raise HTTPException(status_code=503, detail="LLM service not initialized")
 
     result = await ollama_service.warm_model(request.model)
+
+    if "error" in result:
+        raise HTTPException(status_code=502, detail=result["error"])
+
+    return result
+
+
+@router.post("/chat/vision")
+async def analyze_image(request: VisionRequest):
+    """
+    Analyze an image with a vision LLM (qwen2.5vl, llava, etc).
+    
+    Sends the image URL and prompt to the vision model.
+    Works with Ollama's multimodal chat endpoint.
+    """
+    import httpx as _httpx
+
+    messages = [{
+        "role": "user",
+        "content": request.prompt,
+        "images": [request.image_url],
+    }]
+
+    result = await ollama_service.chat_completion(
+        model=request.model,
+        messages=messages,
+    )
 
     if "error" in result:
         raise HTTPException(status_code=502, detail=result["error"])
