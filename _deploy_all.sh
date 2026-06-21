@@ -169,7 +169,27 @@ systemctl daemon-reload
 echo "✅ OOM protection aplicado"
 
 echo ""
-echo "=== [8/8] REINICIAR GATEWAY ==="
+echo "=== [8/9] DEPLOY SERVICIOS DOCKER ==="
+if [ -d "$GATEWAY_PATH" ]; then
+  echo "  Copiando docker-compose.yml..."
+  cp ai-hub-gateway/docker-compose.yml "$GATEWAY_PATH/"
+
+  echo "  Copiando servicios Docker..."
+  mkdir -p "$GATEWAY_PATH/services"
+  cp -r ai-hub-gateway/services/* "$GATEWAY_PATH/services/" 2>/dev/null || true
+
+  echo "  Copiando routers actualizados..."
+  cp ai-hub-gateway/gateway/routers/voice.py "$GATEWAY_PATH/gateway/routers/" 2>/dev/null || true
+  cp ai-hub-gateway/gateway/routers/effects.py "$GATEWAY_PATH/gateway/routers/" 2>/dev/null || true
+
+  echo "✅ Servicios Docker copiados al Gateway"
+  echo "  Para activar: cd $GATEWAY_PATH && docker compose --profile voice up -d"
+else
+  echo "⚠️  No se encontro el Gateway. Saltando deploy Docker."
+fi
+
+echo ""
+echo "=== [9/9] REINICIAR GATEWAY ==="
 systemctl restart ai-hub-gateway
 sleep 5
 if systemctl is-active --quiet ai-hub-gateway; then
