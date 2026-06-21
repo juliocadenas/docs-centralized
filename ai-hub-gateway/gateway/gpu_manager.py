@@ -59,7 +59,7 @@ class GPUManager:
         finally:
             self._queue_waiting -= 1
 
-    def release_gpu(self):
+    async def release_gpu(self):
         """Release GPU lock."""
         self._gpu_semaphore.release()
 
