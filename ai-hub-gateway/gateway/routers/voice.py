@@ -12,16 +12,10 @@ from typing import Optional
 
 from ..models.schemas import SpeechRequest, TranscriptionResponse
 
+from ..config import PIPER_TTS_URL, XTTS_V2_URL, FISH_SPEECH_URL, WHISPER_STT_URL
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-# TTS Engine URLs
-PIPER_TTS_URL = "http://localhost:8010"
-XTTS_V2_URL = "http://localhost:8011"  # XTTS-v2 (to be installed)
-FISH_SPEECH_URL = "http://localhost:8012"  # Fish Speech (to be installed)
-
-# STT URL
-WHISPER_STT_URL = "http://localhost:8020"
 
 
 @router.post("/audio/speech")

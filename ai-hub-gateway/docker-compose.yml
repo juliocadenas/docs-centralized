@@ -1,6 +1,9 @@
 version: "3.8"
 
 services:
+  # ═══════════════════════════════════════════════════════════════
+  # AI HUB GATEWAY - FastAPI principal (siempre activo)
+  # ═══════════════════════════════════════════════════════════════
   ai-hub-gateway:
     build: .
     container_name: ai-hub-gateway
@@ -13,9 +16,14 @@ services:
       - DOCUMUSIC_BASE_URL=http://host.docker.internal:7860
       - WAN2GP_BASE_URL=http://host.docker.internal:7861
       - PIPER_TTS_URL=http://host.docker.internal:8010
-      - XTTS_V2_URL=http://localhost:8011
-      - FISH_SPEECH_URL=http://localhost:8012
+      - XTTS_V2_URL=http://host.docker.internal:8011
+      - FISH_SPEECH_URL=http://host.docker.internal:8012
       - WHISPER_STT_URL=http://host.docker.internal:8020
+      - REMBG_URL=http://host.docker.internal:8050
+      - UPSCALE_URL=http://host.docker.internal:8051
+      - MUSETALK_URL=http://host.docker.internal:8040
+      - LATENTSYNC_URL=http://host.docker.internal:8043
+      - LIVEPORTRAIT_URL=http://host.docker.internal:8044
     extra_hosts:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
@@ -28,8 +36,30 @@ services:
               count: all
               capabilities: [gpu]
 
-  # XTTS-v2 - Multilingual TTS with voice cloning
-  # Run separately: docker compose up xtts-v2
+  # ═══════════════════════════════════════════════════════════════
+  # VOICE - TTS y STT
+  # Activar: docker compose --profile voice up -d
+  # ═══════════════════════════════════════════════════════════════
+
+  # Piper TTS - Fast CPU-based TTS (siempre activo, consume ~200MB RAM)
+  piper-tts:
+    image: rhasspy/wyoming-piper:latest
+    container_name: piper-tts
+    ports:
+      - "8010:10200"
+    volumes:
+      - /mnt/seagate/models/voice/tts/piper:/data
+    command: >
+      python3 -m wyoming_piper
+      --uri tcp://0.0.0.0:10200
+      --piper /usr/lib/wyoming-piper/piper
+      --voice es_ES-davefx-medium
+      --data-dir /data
+    restart: unless-stopped
+    profiles: ["voice", "full"]
+
+  # XTTS-v2 - Multilingual TTS with voice cloning (GPU)
+  # Activar: docker compose --profile voice up xtts-v2 -d
   xtts-v2:
     image: ghcr.io/coqui-ai/xtts-streaming-server:latest
     container_name: xtts-v2
@@ -49,8 +79,7 @@ services:
               count: all
               capabilities: [gpu]
 
-  # Fish Speech - Natural voice TTS
-  # Run separately: docker compose --profile voice up fish-speech
+  # Fish Speech - Natural voice TTS (GPU)
   fish-speech:
     image: fishaudio/fish-speech:latest
     container_name: fish-speech
@@ -60,6 +89,108 @@ services:
       - /mnt/seagate/models/voice/tts/fish-speech:/app/models
     restart: unless-stopped
     profiles: ["voice", "full"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # Whisper STT - Speech to Text (GPU)
+  # Activar: docker compose --profile voice up whisper-stt -d
+  whisper-stt:
+    build:
+      context: ./services/whisper-stt
+      dockerfile: Dockerfile
+    container_name: whisper-stt
+    ports:
+      - "8020:8000"
+    volumes:
+      - /mnt/seagate/models/voice/stt:/models
+    environment:
+      - WHISPER_MODEL=large-v3
+      - WHISPER_DEVICE=cuda
+    restart: unless-stopped
+    profiles: ["voice", "full"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # ═══════════════════════════════════════════════════════════════
+  # EFFECTS - Background removal y Upscale
+  # Activar: docker compose --profile effects up -d
+  # ═══════════════════════════════════════════════════════════════
+
+  # Rembg - Background removal (CPU, ligero)
+  rembg:
+    image: danielgatis/rembg:latest
+    container_name: rembg
+    ports:
+      - "8050:80"
+    command: ["s", "-p", "80"]
+    restart: unless-stopped
+    profiles: ["effects", "full"]
+
+  # Real-ESRGAN - Image upscale (GPU)
+  upscale:
+    build:
+      context: ./services/upscale
+      dockerfile: Dockerfile
+    container_name: upscale
+    ports:
+      - "8051:8000"
+    restart: unless-stopped
+    profiles: ["effects", "full"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # ═══════════════════════════════════════════════════════════════
+  # AVATAR - Lip-sync, Portrait Animation
+  # Activar: docker compose --profile avatar up -d
+  # ═══════════════════════════════════════════════════════════════
+
+  # MuseTalk - Real-time lip-sync (GPU)
+  musetalk:
+    build:
+      context: ./services/musetalk
+      dockerfile: Dockerfile
+    container_name: musetalk
+    ports:
+      - "8040:7860"
+    volumes:
+      - /mnt/seagate/models/avatar/musetalk:/models
+    restart: unless-stopped
+    profiles: ["avatar", "full"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # LivePortrait - Portrait animation (GPU)
+  liveportrait:
+    build:
+      context: ./services/liveportrait
+      dockerfile: Dockerfile
+    container_name: liveportrait
+    ports:
+      - "8044:7860"
+    volumes:
+      - /mnt/seagate/models/avatar/liveportrait:/models
+    restart: unless-stopped
+    profiles: ["avatar", "full"]
     deploy:
       resources:
         reservations:

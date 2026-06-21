@@ -12,11 +12,10 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException
 from fastapi.responses import Response
 from typing import Optional
 
+from ..config import REMBG_URL, UPSCALE_URL
+
 logger = logging.getLogger(__name__)
 router = APIRouter()
-
-REMBG_URL = "http://localhost:8050"
-UPSCALE_URL = "http://localhost:8051"
 
 
 async def _fetch_image(image_url: str) -> tuple[bytes, str]:
