@@ -84,11 +84,19 @@ async def get_status():
 @router.get("/models", response_model=ModelList)
 async def list_models():
     """List all available models across all services (OpenAI-compatible)."""
+    global _models_cache, _models_cache_time
+
     models = []
 
-    # Get LLM models from Ollama
+    # Get LLM models from Ollama (with cache to avoid hammering /api/tags)
     if ollama_service:
-        ollama_models = await ollama_service.list_models()
+        now = time.time()
+        if _models_cache and (now - _models_cache_time) < _MODELS_CACHE_TTL:
+            ollama_models = _models_cache
+        else:
+            ollama_models = await ollama_service.list_models()
+            _models_cache = ollama_models
+            _models_cache_time = now
         for m in ollama_models:
             models.append(ModelInfo(**m))
 
