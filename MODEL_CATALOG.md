@@ -1,7 +1,7 @@
 # 📦 Catalogo de Modelos AI - Hub Madrid
 
 > Fuente de verdad para modelos disponibles y planificados.
-> Ultima actualizacion: 19 junio 2026 (Qwen2.5 + Qwen2.5-Coder instalados + sincronizacion con estado real)
+> Ultima actualizacion: 21 junio 2026 (Qwen2.5-VL + nomic-embed-text instalados + fixes async bugs)
 
 ---
 
@@ -13,11 +13,19 @@
 | Llama 3.1 | `llama3.1` | Chat/Instruct | ~5GB | 11434 (Ollama) | ✅ Activo |
 | Qwen 2.5 7B | `qwen2.5:7b` | Chat/Instruct/Multilingue | ~5GB | 11434 (Ollama) | ✅ Activo (INSTALADO 19 jun 2026) |
 | Qwen 2.5 Coder 7B | `qwen2.5-coder:7b` | Programacion/Code | ~5GB | 11434 (Ollama) | ✅ Activo (INSTALADO 19 jun 2026) |
+| Qwen 2.5 VL 7B | `qwen2.5vl:7b` | Vision/Multimodal | ~6GB | 11434 (Ollama) | ✅ Activo (INSTALADO 21 jun 2026) |
+| Nomic Embed Text | `nomic-embed-text` | Embeddings | ~0.3GB | 11434 (Ollama) | ✅ Activo (INSTALADO 21 jun 2026) |
 
 > **Nota sobre Qwen 2.5:** Modelo de Alibaba, superior a Llama 3.1 en razonamiento, español y codigo.
 > Se puede usar via Gateway: `model="qwen2.5:7b"` o `model="qwen2.5-coder:7b"` (incluyendo el tag `:7b`)
+>
+> **Qwen 2.5 VL (Vision-Language):** Modelo multimodal - puede analizar imágenes.
+> Usar via `/v1/chat/completions` con `images` en el mensaje (formato OpenAI Vision).
+>
+> **Nomic Embed Text:** Genera embeddings (vectores) de texto para RAG/búsqueda semántica.
+> Usar via `POST /v1/embeddings` con `model="nomic-embed-text"`.
 
-### 🎭 Avatares & Lip-sync (INSTALADO 8 junio 2026)
+### � Avatares & Lip-sync (INSTALADO 8 junio 2026)
 | Modelo | ID | Tipo | VRAM | Puerto | Path | Estado |
 |--------|-----|------|------|--------|------|--------|
 | Hallo2 (Fudan) | `hallo2` | Foto+Audio→Video | ~6GB | 8070 | `/mnt/seagate/models/hallo2/` | ✅ Activo |
@@ -25,7 +33,7 @@
 | LivePortrait (KwaiVGI) | `liveportrait` | Animacion facial | ~4GB | 8044 | `/mnt/seagate/models/liveportrait/` | ✅ Activo |
 | MuseTalk (TME) | `musetalk` | Lip-sync tiempo real | ~4GB | 8040 | `/mnt/seagate/models/musetalk/` | ✅ Activo |
 
-### 🎬 Video Generation Avanzada
+### �🎬 Video Generation Avanzada
 | Modelo | ID | Tipo | VRAM | Puerto | Path | Estado |
 |--------|-----|------|------|--------|------|--------|
 | CogVideoX (THUDM) | `cogvideox` | Video HQ | ~12GB | 7861 | `/mnt/seagate/CogVideoX/` | ❌ Fallido (requiere re-instalar) |
@@ -110,8 +118,8 @@
 - Audio: 56GB
 - Vision: 49GB
 - Avatares (checkpoints): 28.9GB (Hallo2 13GB + LatentSync 7.5GB + LivePortrait 2GB + MuseTalk 6.4GB)
-- LLM: ~15GB (Llama 3.1 + Qwen 2.5 + Qwen 2.5 Coder)
-- **Total: ~149GB de 1.8TB (8.3%)**
+- LLM: ~21GB (Llama 3.1 + Qwen 2.5 + Qwen 2.5 Coder + Qwen 2.5 VL + nomic-embed-text)
+- **Total: ~155GB de 1.8TB (8.6%)**
 
 ### VRAM por Perfil
 | Perfil | Servicios | VRAM Total |
