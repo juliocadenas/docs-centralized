@@ -59,3 +59,8 @@ output/
 # Logs
 *.log
 logs/"ai-hub-studio/"  
+"# Temp deploy files"  
+"_deploy_ssh.py"  
+"_deploy_on_server.sh"  
+"ai-hub-changes.bundle"  
+"*.bundle" 
