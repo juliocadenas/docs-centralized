@@ -112,6 +112,7 @@ class OllamaService:
         tools: Optional[List[Dict]] = None,
     ) -> Dict:
         """Send a chat completion request to Ollama (OpenAI-compatible)."""
+        start_time = time.time()
         try:
             if options:
                 payload = {
@@ -149,29 +150,47 @@ class OllamaService:
             if tools:
                 payload["tools"] = tools
 
+            # Check if model is likely not loaded yet (for logging)
+            model_cold = model not in self._loaded_models
+            if model_cold:
+                logger.info("Chat request for '%s' (cold start - may take longer)", model)
+
             resp = await self.client.post(
                 f"{self.base_url}/v1/chat/completions",
                 json=payload,
                 timeout=300.0,
             )
 
+            elapsed = time.time() - start_time
             if resp.status_code == 200:
                 self._loaded_models.add(model)
+                # Log timing (helps identify slow models)
+                logger.info(
+                    "Chat '%s' completed in %.1fs (%s)",
+                    model, elapsed, "cold" if model_cold else "warm",
+                )
                 return resp.json()
             else:
                 logger.warning(
-                    "Ollama OpenAI endpoint returned %d, falling back to native API",
-                    resp.status_code,
+                    "Ollama OpenAI endpoint returned %d (%.1fs), falling back to native API",
+                    resp.status_code, elapsed,
                 )
                 return await self._native_chat(model, messages, temperature, top_p)
 
         except httpx.ConnectError:
+            logger.error("Ollama connect error after %.1fs", time.time() - start_time)
             return {
                 "error": "Ollama service is not available. "
                          "Please ensure Ollama is running on the server."
             }
+        except httpx.ReadTimeout:
+            logger.error("Ollama timeout after %.1fs for model '%s'", time.time() - start_time, model)
+            return {
+                "error": f"Ollama timed out after 300s. The model '{model}' may be too large "
+                         "or still loading. Try again or use a smaller model."
+            }
         except Exception as e:
-            logger.error("Chat completion error: %s", e)
+            logger.error("Chat completion error after %.1fs: %s", time.time() - start_time, e)
             return {"error": str(e)}
 
     async def _native_chat(
