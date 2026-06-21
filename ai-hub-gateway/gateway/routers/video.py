@@ -59,7 +59,7 @@ async def create_video(request: VideoGenerationRequest):
         )
     finally:
         if gpu_manager:
-            gpu_manager.release_gpu()
+            await gpu_manager.release_gpu()
 
     if "error" in result:
         raise HTTPException(status_code=502, detail=result["error"])

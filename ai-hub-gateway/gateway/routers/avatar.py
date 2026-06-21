@@ -70,6 +70,12 @@ async def create_lipsync(request: LipSyncRequest):
                 id=task_id, created=created, model=request.model,
                 status="processing"
             )
+    except httpx.ConnectError:
+        logger.error("Lip-sync service not available")
+        return LipSyncResponse(
+            id=task_id, created=created, model=request.model,
+            status=f"error: {request.model} service not available"
+        )
     except Exception as e:
         logger.error(f"Lip-sync error: {e}")
         return LipSyncResponse(
@@ -78,7 +84,7 @@ async def create_lipsync(request: LipSyncRequest):
         )
     finally:
         if gpu_manager:
-            gpu_manager.release_gpu()
+            await gpu_manager.release_gpu()
 
 
 @router.post("/avatar/portrait", response_model=PortraitAnimationResponse)
@@ -126,7 +132,7 @@ async def create_portrait_animation(request: PortraitAnimationRequest):
         )
     finally:
         if gpu_manager:
-            gpu_manager.release_gpu()
+            await gpu_manager.release_gpu()
 
 
 @router.post("/avatar/digital-human", response_model=DigitalHumanResponse)

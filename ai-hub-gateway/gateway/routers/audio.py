@@ -66,7 +66,7 @@ async def create_audio(request: AudioGenerationRequest):
         raise HTTPException(status_code=500, detail=f"Audio generation failed: {str(e)}")
     finally:
         if gpu_manager:
-            gpu_manager.release_gpu()
+            await gpu_manager.release_gpu()
 
     if isinstance(result, dict) and "error" in result:
         raise HTTPException(status_code=502, detail=result["error"])
