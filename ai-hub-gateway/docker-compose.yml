@@ -28,9 +28,9 @@ services:
       - "host.docker.internal:host-gateway"
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/v1/status"]
+      test: ["CMD", "curl", "-sf", "http://localhost:9000/v1/health"]
       interval: 30s
-      timeout: 10s
+      timeout: 5s
       retries: 3
       start_period: 10s
     # GPU access for nvidia-smi monitoring

@@ -4,3 +4,6 @@ uvicorn[standard]>=0.24.0
 httpx>=0.25.0
 pydantic>=2.5.0
 python-dotenv>=1.0.0
+python-multipart>=0.0.6   # For file uploads (STT, rembg, upscale)
+pyyaml>=6.0               # For model_registry.yaml
+aiofiles>=23.0            # For async file serving
