@@ -103,6 +103,13 @@ async def list_models():
         # Effects models
         ModelInfo(id="rembg", type="remove-background", service="rembg", vram_mb=0, status="available"),
         ModelInfo(id="real-esrgan", type="upscale", service="upscale", vram_mb=2000, status="available"),
+        # Vision models
+        ModelInfo(id="qwen2.5vl:7b", type="vision-llm", service="ollama", vram_mb=5000, status="available"),
+        # Embedding models
+        ModelInfo(id="nomic-embed-text", type="embeddings", service="ollama", vram_mb=500, status="available"),
+        # Digital Human models
+        ModelInfo(id="hallo2", type="digital-human", service="hallo2", vram_mb=6000, status="available"),
+        ModelInfo(id="higgsfield", type="video-effects", service="higgsfield", vram_mb=4000, status="available"),
     ]
     models.extend(static_models)
 
@@ -183,5 +190,7 @@ async def _get_all_model_ids() -> list:
         "whisper",
         "musetalk", "latentsync", "liveportrait",
         "rembg", "real-esrgan",
+        "qwen2.5vl", "nomic-embed-text",
+        "hallo2", "higgsfield",
     ])
     return models

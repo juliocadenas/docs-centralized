@@ -13,7 +13,7 @@ from typing import Optional
 GATEWAY_HOST = os.getenv("GATEWAY_HOST", "0.0.0.0")
 GATEWAY_PORT = int(os.getenv("GATEWAY_PORT", "9000"))
 GATEWAY_TITLE = "AI Hub Madrid - Gateway API"
-GATEWAY_VERSION = "2.0.0"
+GATEWAY_VERSION = "2.1.0"  # +embeddings, +vision, +warm_model, +multimodal
 API_V1_PREFIX = "/v1"
 
 # ============================================================
