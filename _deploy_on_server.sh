@@ -10,8 +10,9 @@ echo "============================================================"
 echo "  DEPLOY AI HUB GATEWAY - NAB9"
 echo "============================================================"
 
-GATEWAY_DIR="/mnt/seagate/api/ai-hub-gateway"
+GATEWAY_DIR="/mnt/seagate/ai-hub-gateway"
 REPO_DIR="/mnt/seagate/api/IA-HUB-MADRID1"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Colores
 GREEN='\033[0;32m'
@@ -34,28 +35,30 @@ if [[ "$HOSTNAME" != *"nab9"* ]] && [[ "$HOSTNAME" != *"madrid"* ]]; then
 fi
 info "   Hostname: $HOSTNAME"
 
-# 2. Clonar o actualizar el repo
+# 2. Detectar fuente de código
 echo ""
-info "2. Actualizando repositorio..."
-if [ -d "$REPO_DIR/.git" ]; then
-    info "   Repo existe, haciendo pull..."
+info "2. Detectando fuente de código..."
+
+# Prioridad: 1) tar.gz descomprimido en /tmp, 2) repo local, 3) gateway existente
+if [ -d "$SCRIPT_DIR/ai-hub-gateway" ]; then
+    SOURCE_DIR="$SCRIPT_DIR/ai-hub-gateway"
+    info "   Usando código del paquete deploy: $SCRIPT_DIR"
+elif [ -d "$REPO_DIR/ai-hub-gateway" ]; then
+    SOURCE_DIR="$REPO_DIR/ai-hub-gateway"
     cd "$REPO_DIR"
     git pull origin main 2>/dev/null || warn "   No se pudo hacer pull (sin internet?), usando código local"
+    info "   Usando repo: $REPO_DIR"
+elif [ -d "$GATEWAY_DIR" ]; then
+    SOURCE_DIR="$GATEWAY_DIR"
+    warn "   Usando gateway existente (sin actualización de código): $GATEWAY_DIR"
 else
-    info "   Clonando repo..."
-    mkdir -p "$(dirname $REPO_DIR)"
-    git clone https://github.com/juliocadenas/IA-HUB-MADRID1.git "$REPO_DIR" 2>/dev/null || {
-        warn "   No se pudo clonar. ¿Usar código local de $GATEWAY_DIR?"
-    }
+    error "   No se encontró código fuente en ningún sitio!"
+    exit 1
 fi
 
 # 3. Sincronizar archivos del gateway
 echo ""
 info "3. Sincronizando archivos del gateway..."
-SOURCE_DIR="${REPO_DIR}/ai-hub-gateway"
-if [ ! -d "$SOURCE_DIR" ]; then
-    SOURCE_DIR="$GATEWAY_DIR"
-fi
 
 # Copiar routers
 mkdir -p "$GATEWAY_DIR/gateway/routers"
@@ -104,10 +107,18 @@ if [ -d "$SOURCE_DIR/services" ]; then
     done
 fi
 
+# Detectar si ya somos root (deploy_auto.py ejecuta con sudo)
+if [ "$(id -u)" -eq 0 ]; then
+    SUDO=""
+    info "   Ejecutando como root"
+else
+    SUDO="sudo"
+fi
+
 # 4. Reiniciar gateway
 echo ""
 info "4. Reiniciando AI Hub Gateway..."
-sudo systemctl restart ai-hub-gateway
+$SUDO systemctl restart ai-hub-gateway
 sleep 3
 
 # 5. Verificar estado
