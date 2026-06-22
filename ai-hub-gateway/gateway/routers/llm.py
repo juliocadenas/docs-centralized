@@ -154,6 +154,7 @@ async def create_embeddings(request: EmbeddingRequest):
     # Normalize input to list (OpenAI accepts string or list[str])
     texts = request.input if isinstance(request.input, list) else [request.input]
 
+    gpu_manager.mark_service_used("ollama")
     result = await ollama_service.embeddings(
         model=request.model,
         input=texts,
@@ -176,6 +177,7 @@ async def warm_model(request: WarmModelRequest):
     if not ollama_service:
         raise HTTPException(status_code=503, detail="LLM service not initialized")
 
+    gpu_manager.mark_service_used("ollama")
     result = await ollama_service.warm_model(request.model)
 
     if "error" in result:
@@ -202,10 +204,13 @@ async def analyze_image(request: VisionRequest):
     }]
 
     try:
-        result = await ollama_service.chat_completion(
-            model=request.model,
-            messages=messages,
-        )
+        gpu_manager.mark_service_used("ollama")
+        # Vision models are heavy - acquire GPU lock
+        async with gpu_manager.acquire_gpu():
+            result = await ollama_service.chat_completion(
+                model=request.model,
+                messages=messages,
+            )
     except Exception as e:
         logger.error(f"Vision analysis error: {e}")
         raise HTTPException(status_code=502, detail=f"Vision model error: {str(e)}")
