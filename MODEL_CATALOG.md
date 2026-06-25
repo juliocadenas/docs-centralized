@@ -10,7 +10,10 @@
 ### LLM (Large Language Models)
 | Modelo | ID | Tipo | VRAM | Puerto | Estado |
 |--------|-----|------|------|--------|--------|
-| Llama 3.1 | `llama3.1` | Chat/Instruct | ~5GB | 11434 (Ollama) | ✅ Activo |
+| Qwen 2.5 14B | `qwen2.5:14b` | Chat/Multilingue/Calidad | ~8GB | 11434 (Ollama) | ✅ Activo (25 jun 2026) |
+| Gemma 2 9B | `gemma2:9b` | Chat/Instruct | ~5.5GB | 11434 (Ollama) | ✅ Activo (25 jun 2026) |
+| Llama 3.1 8B | `llama3.1` | Chat/Instruct | ~5GB | 11434 (Ollama) | ✅ Activo |
+| Llama 3.2 3B | `llama3.2:3b` | Chat/Rapido | ~2GB | 11434 (Ollama) | ✅ Activo (25 jun 2026) |
 | Qwen 2.5 7B | `qwen2.5:7b` | Chat/Instruct/Multilingue | ~5GB | 11434 (Ollama) | ✅ Activo (INSTALADO 19 jun 2026) |
 | Qwen 2.5 Coder 7B | `qwen2.5-coder:7b` | Programacion/Code | ~5GB | 11434 (Ollama) | ✅ Activo (INSTALADO 19 jun 2026) |
 | Qwen 2.5 VL 7B | `qwen2.5vl:7b` | Vision/Multimodal | ~6GB | 11434 (Ollama) | ✅ Activo (INSTALADO 21 jun 2026) |
@@ -84,6 +87,7 @@
 |--------|-----|------|------|--------|----------------|-----|
 | XTTS-v2 | `xtts-v2` | TTS con voice cloning | ~3GB | **8011** | `coqui/XTTS-v2` | TTS multilingue | 🔧 Docker listo |
 | Fish Speech | `fish-speech` | TTS natural | ~3GB | **8012** | `fishaudio/fish-speech-1.5` | TTS alternativo | 🔧 Docker listo |
+| OmniVoice Studio | `omnivoice` | TTS 646 idiomas + clonación | ~4GB | **8030** | `OmniVoice Studio` | TTS multilingue avanzado | 🔧 Docker listo |
 | Open-Sora | `open-sora` | Text-to-Video | ~10GB | 7863 | `hpcai-tech/Open-Sora` | Video generation tipo Sora (open source) |
 
 ### 🤖 Humanos Digitales & VTubers (Prioridad MEDIA)
@@ -118,8 +122,8 @@
 - Audio: 56GB
 - Vision: 49GB
 - Avatares (checkpoints): 28.9GB (Hallo2 13GB + LatentSync 7.5GB + LivePortrait 2GB + MuseTalk 6.4GB)
-- LLM: ~21GB (Llama 3.1 + Qwen 2.5 + Qwen 2.5 Coder + Qwen 2.5 VL + nomic-embed-text)
-- **Total: ~155GB de 1.8TB (8.6%)**
+- LLM: ~37GB (+ Qwen 2.5 14B 8GB + Gemma 2 9B 5.5GB + Llama 3.2 3B 2GB)
+- **Total: ~175GB de 1.8TB (9.7%)**
 
 ### VRAM por Perfil
 | Perfil | Servicios | VRAM Total |

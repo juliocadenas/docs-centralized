@@ -1,0 +1,79 @@
+# 🖥️ Reglas Específicas NAB9
+
+Reglas específicas para el servidor de IA (NAB9 / Madrid).
+
+---
+
+## Gestión de Modelos
+
+### Rutas canónicas
+
+```
+/mnt/seagate/models/
+├── audio/          # YuE, ACE-Step, DiffRhythm
+├── vision/         # WAN 2.1, LTX, HunyuanVideo
+├── hallo2/         # Hallo2 checkpoints
+├── latentsync/     # LatentSync
+├── liveportrait/   # LivePortrait
+├── musetalk/       # MuseTalk
+└── llm/            # Modelos Ollama
+```
+
+### Reglas
+1. **Un modelo = una ruta canónica.** No duplicar modelos en diferentes rutas.
+2. Usar symlinks en `/mnt/seagate/links/` para compatibilidad con cada herramienta.
+3. ComfyUI configura rutas extras en `extra_model_paths.yaml`.
+4. Actualizar `model_registry.yaml` al añadir modelos.
+
+## Gestión de VRAM (16GB RTX 5080)
+
+### Servicios always-on
+- Ollama (~4GB) | Piper TTS (CPU) | Whisper STT (~2GB) | Rembg (~0.5GB)
+
+### Auto-unload watchdog
+- Cada 60s revisa servicios GPU idle.
+- Los sin actividad >10 min se detienen automáticamente.
+
+### Perfiles
+- **Desarrollo** (default): Ollama + ComfyUI (~6-8GB)
+- **Video Pesado**: Wan2GP + Ollama (~12-16GB)
+- **Audio/Música**: DocuMusic + Ollama (~8-12GB)
+- **Avatar**: Hallo2 + LatentSync + Ollama (~14-16GB)
+
+## Systemd Services
+
+| Servicio | Unit File | Auto-restart |
+|----------|-----------|--------------|
+| AI Hub Gateway | `ai-hub-gateway.service` | ✅ |
+| ComfyUI | `comfyui.service` | ✅ |
+| Wan2GP | `wan2gp.service` | ✅ |
+| TTS (Piper) | `tts.service` | ✅ |
+| STT (Whisper) | `stt.service` | ✅ |
+
+## Monitoreo y Alertas
+
+- **Health Check**: cron cada 5 min, auto-recovery
+- **VRAM Watchdog** (`vram-watchdog.service`): mata procesos si VRAM >90%
+- **Telegram Alert Bot**: notifica si Gateway cae o VRAM >85%
+- **Uptime Kuma** (en XEON): monitorea desde fuera
+
+## Procedimientos
+
+### Añadir un modelo nuevo
+1. Añadir entrada en `MODEL_CATALOG.md`
+2. Actualizar `model_registry.yaml`
+3. Descargar a ruta canónica en `/mnt/seagate/models/{categoria}/`
+4. Crear wrapper Docker/FastAPI usando template
+5. Registrar en el Gateway como servicio enrutable
+
+### Reiniciar todo tras un fallo
+```bash
+sudo systemctl restart ai-hub-gateway
+sudo systemctl restart comfyui
+# Esperar 30s
+curl http://100.105.27.27:9000/v1/status
+```
+
+---
+
+→ [Reglas globales](global-rules.md) | [Infraestructura NAB9](../infra/nab9.md)

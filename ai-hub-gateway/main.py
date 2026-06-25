@@ -26,6 +26,7 @@ ALLOWED_ORIGINS = os.environ.get(
 ).split(",")
 from gateway.gpu_manager import GPUManager
 from gateway.routers import llm_router, images_router, audio_router, video_router, status_router, voice_router, avatar_router, effects_router
+from gateway.routers.rag import router as rag_router
 from gateway.routers.llm import set_service as set_llm_service
 from gateway.routers.images import set_service as set_images_service
 from gateway.routers.audio import set_service as set_audio_service
@@ -99,12 +100,20 @@ app = FastAPI(
         "- `POST /v1/chat/completions/stream` - Streaming LLM Chat (SSE)\n"
         "- `POST /v1/chat/vision` - Image Analysis (Qwen2.5-VL)\n"
         "- `POST /v1/embeddings` - Text Embeddings (nomic-embed-text)\n"
+        "- `GET /v1/rag/health` - RAG System Health Check\n"
+        "- `GET /v1/rag/collections` - List Knowledge Collections\n"
+        "- `POST /v1/rag/collections` - Create Knowledge Collection\n"
+        "- `POST /v1/rag/upload` - Upload Document to Knowledge Base\n"
+        "- `POST /v1/rag/query` - Query Knowledge Base (RAG)\n"
+        "- `DELETE /v1/rag/collections/{name}` - Delete Collection\n"
         "- `POST /v1/models/warm` - Pre-load Model into VRAM\n"
         "- `POST /v1/images/generations` - Image Generation (ComfyUI)\n"
         "- `POST /v1/audio/generations` - Audio/Music Generation (DocuMusic)\n"
         "- `POST /v1/audio/speech` - Text-to-Speech (Piper TTS)\n"
         "- `POST /v1/audio/transcriptions` - Speech-to-Text (Whisper STT)\n"
         "- `POST /v1/video/generations` - Video Generation (Wan2GP)\n"
+        "- `POST /v1/video/agentic` - Full Agentic Video Pipeline (OpenMontage + Remotion)\n"
+        "- `GET /v1/video/agentic/{job_id}/status` - Check Agentic Video Status\n"
         "- `POST /v1/avatar/lipsync` - Lip-sync (MuseTalk/LatentSync)\n"
         "- `POST /v1/avatar/portrait` - Portrait Animation (LivePortrait)\n"
         "- `POST /v1/avatar/digital-human` - Full Digital Human Pipeline\n"
@@ -144,6 +153,7 @@ app.include_router(status_router, prefix="/v1", tags=["System"])
 app.include_router(voice_router, prefix="/v1", tags=["Voice (TTS/STT)"])
 app.include_router(avatar_router, prefix="/v1", tags=["Avatar & Digital Human"])
 app.include_router(effects_router, prefix="/v1", tags=["Effects"])
+app.include_router(rag_router, tags=["RAG"])
 
 
 @app.get("/")

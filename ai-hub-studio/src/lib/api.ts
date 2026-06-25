@@ -1,4 +1,4 @@
-/**
+x/**
  * AI Hub Studio - API Client
  * Connects to the Gateway at http://100.105.27.27:9000/v1
  */
@@ -180,13 +180,19 @@ export async function chatCompletionsStream(
   return fullText;
 }
 
-// Generate image
+// Generate image - with advanced ComfyUI parameters
 export async function generateImage(params: {
   prompt: string;
-  model?: string;
+  model?: string;        // 'flux' | 'sdxl' | 'sd15'
   negative_prompt?: string;
-  width?: number;
-  height?: number;
+  width?: number;        // default 1024
+  height?: number;       // default 1024
+  steps?: number;        // 15-50 (default 20)
+  cfg?: number;          // 1-20 (default 7.0)
+  sampler_name?: string; // 'euler', 'dpmpp_2m', 'ddim'
+  scheduler?: string;    // 'normal', 'karras', 'exponential'
+  seed?: number;         // -1 = random
+  batch_size?: number;   // generate multiple
 }): Promise<ImageGenResponse> {
   const res = await fetch(`${GATEWAY_URL}/images/generations`, {
     method: 'POST',
@@ -261,22 +267,63 @@ export async function manageService(service: string, action: 'start' | 'stop') {
   return res.json();
 }
 
-// === TTS (Text-to-Speech) ===
+// === TTS (Text-to-Speech) with Fallback Chain ===
+export interface TTSResult {
+  blob: Blob;
+  engineUsed: string;
+  fellBack: boolean;
+}
+
+const TTS_FALLBACK_CHAIN: Record<string, string[]> = {
+  piper: ['piper', 'xtts', 'fish'],
+  xtts: ['xtts', 'piper', 'fish'],
+  fish: ['fish', 'piper', 'xtts'],
+};
+
 export async function generateSpeech(params: {
   input: string;
-  model?: string; // 'piper' | 'xtts' | 'fish'
+  model?: string;
   voice?: string;
   language?: string;
   speaker_wav?: string;
   response_format?: string;
 }): Promise<Blob> {
-  const res = await fetch(`${GATEWAY_URL}/audio/speech`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(params),
-  });
-  if (!res.ok) throw new Error(`TTS error: ${res.status}`);
-  return res.blob();
+  const result = await generateSpeechWithFallback(params);
+  return result.blob;
+}
+
+export async function generateSpeechWithFallback(params: {
+  input: string;
+  model?: string;
+  voice?: string;
+  language?: string;
+  speaker_wav?: string;
+  response_format?: string;
+}): Promise<TTSResult> {
+  const requestedEngine = params.model || 'piper';
+  const chain = TTS_FALLBACK_CHAIN[requestedEngine] || TTS_FALLBACK_CHAIN.piper;
+  let lastError = '';
+
+  for (const engine of chain) {
+    try {
+      const res = await fetch(`${GATEWAY_URL}/audio/speech`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...params, model: engine }),
+      });
+      if (res.ok) {
+        return {
+          blob: await res.blob(),
+          engineUsed: engine,
+          fellBack: engine !== requestedEngine,
+        };
+      }
+      lastError = `TTS ${engine}: HTTP ${res.status}`;
+    } catch (e: any) {
+      lastError = e.message || `TTS ${engine} failed`;
+    }
+  }
+  throw new Error(`Todos los motores TTS fallaron. Ultimo error: ${lastError}`);
 }
 
 // === STT (Speech-to-Text) ===
@@ -312,7 +359,7 @@ export async function listVoices(): Promise<{
 export async function lipsyncVideo(params: {
   video_url?: string;
   audio_url?: string;
-  model?: string; // 'musetalk' | 'latentsync' | 'sadtalker' | 'wav2lip'
+  model?: string;
 }): Promise<{ video_url: string; model: string }> {
   const res = await fetch(`${GATEWAY_URL}/avatar/lipsync`, {
     method: 'POST',
@@ -328,7 +375,7 @@ export async function animatePortrait(params: {
   source_image_url: string;
   driving_video_url: string;
   relative_motion?: boolean;
-  model?: string; // 'liveportrait'
+  model?: string;
 }): Promise<{ video_url: string; model: string }> {
   const res = await fetch(`${GATEWAY_URL}/avatar/portrait`, {
     method: 'POST',
@@ -339,7 +386,7 @@ export async function animatePortrait(params: {
   return res.json();
 }
 
-// === Digital Human (Full Pipeline: LLM → TTS → Lip-sync) ===
+// === Digital Human (Full Pipeline: LLM -> TTS -> Lip-sync) ===
 export async function createDigitalHuman(params: {
   prompt: string;
   image_url?: string;
@@ -363,7 +410,6 @@ export async function createDigitalHuman(params: {
 }
 
 // === Effects: Remove Background ===
-// Backend expects multipart/form-data with 'file' or 'image_url'
 export async function removeBackground(params: {
   file?: File;
   image_url?: string;
@@ -386,15 +432,14 @@ export async function removeBackground(params: {
     body: formData,
   });
   if (!res.ok) throw new Error(`Remove bg error: ${res.status}`);
-  return res.blob(); // Returns image binary
+  return res.blob();
 }
 
 // === Effects: Upscale ===
-// Backend expects multipart/form-data with 'file' or 'image_url'
 export async function upscaleImage(params: {
   file?: File;
   image_url?: string;
-  scale?: number; // 2, 4
+  scale?: number;
 }): Promise<Blob> {
   const formData = new FormData();
   if (params.file) {
@@ -413,7 +458,7 @@ export async function upscaleImage(params: {
     body: formData,
   });
   if (!res.ok) throw new Error(`Upscale error: ${res.status}`);
-  return res.blob(); // Returns image binary
+  return res.blob();
 }
 
 // === Embeddings (text vectors) ===
@@ -434,7 +479,7 @@ export async function createEmbeddings(
 export async function analyzeImage(params: {
   image_url: string;
   prompt?: string;
-  model?: string; // 'qwen2.5vl:7b'
+  model?: string;
 }): Promise<ChatResponse> {
   const res = await fetch(`${GATEWAY_URL}/chat/vision`, {
     method: 'POST',
@@ -468,6 +513,47 @@ export async function healthCheck(): Promise<{
 }> {
   const res = await fetch(`${GATEWAY_URL}/health`);
   if (!res.ok) throw new Error('Gateway not responding');
+  return res.json();
+}
+
+// === Agentic Video Pipeline (OpenMontage + Remotion) ===
+export interface AgenticVideoResponse {
+  job_id: string;
+  status: string;
+  message: string;
+  estimated_time_seconds: number;
+}
+
+export interface AgenticVideoStatus {
+  job_id: string;
+  status: 'started' | 'processing' | 'completed' | 'error';
+  progress: number;
+  message: string;
+  video_url?: string;
+  video_path?: string;
+  timestamp?: number;
+}
+
+export async function createAgenticVideo(params: {
+  topic: string;
+  duration_seconds?: number;
+  style?: string;
+  language?: string;
+  voice?: string;
+  model?: string;
+}): Promise<AgenticVideoResponse> {
+  const res = await fetch(`${GATEWAY_URL}/video/agentic`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) throw new Error(`Agentic video error: ${res.status}`);
+  return res.json();
+}
+
+export async function getAgenticVideoStatus(jobId: string): Promise<AgenticVideoStatus> {
+  const res = await fetch(`${GATEWAY_URL}/video/agentic/${jobId}/status`);
+  if (!res.ok) throw new Error(`Status check error: ${res.status}`);
   return res.json();
 }
 

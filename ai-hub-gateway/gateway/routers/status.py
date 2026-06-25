@@ -102,10 +102,13 @@ async def list_models():
 
     # Add static model entries from other services
     static_models = [
-        # Image models
+        # Image models (Standard)
         ModelInfo(id="sdxl", type="text-to-image", service="comfyui", vram_mb=6144, status="available"),
         ModelInfo(id="flux", type="text-to-image", service="comfyui", vram_mb=8192, status="available"),
         ModelInfo(id="sd15", type="text-to-image", service="comfyui", vram_mb=2048, status="available"),
+        # Image models (Turbo - 1-4 steps)
+        ModelInfo(id="sdxl-turbo", type="text-to-image", service="comfyui", vram_mb=6144, status="available"),
+        ModelInfo(id="flux-schnell", type="text-to-image", service="comfyui", vram_mb=8192, status="available"),
         # Audio models
         ModelInfo(id="yue", type="text-to-music", service="documusic", vram_mb=8192, status="available"),
         ModelInfo(id="ace-step", type="text-to-music", service="documusic", vram_mb=4096, status="available"),
@@ -118,6 +121,7 @@ async def list_models():
         ModelInfo(id="piper", type="text-to-speech", service="piper_tts", vram_mb=0, status="available"),
         ModelInfo(id="xtts-v2", type="text-to-speech", service="xtts_v2", vram_mb=3000, status="available"),
         ModelInfo(id="fish-speech", type="text-to-speech", service="fish_speech", vram_mb=3000, status="available"),
+        ModelInfo(id="omnivoice", type="text-to-speech", service="omnivoice", vram_mb=4096, status="available"),
         # STT models
         ModelInfo(id="whisper", type="speech-to-text", service="whisper_stt", vram_mb=2000, status="available"),
         # Avatar models
@@ -207,10 +211,10 @@ async def _get_all_model_ids() -> list:
         ollama_models = await ollama_service.list_models()
         models.extend(ollama_models)
     models.extend([
-        "sdxl", "flux", "sd15",
+        "sdxl", "sdxl-turbo", "flux", "flux-schnell", "sd15",
         "yue", "ace-step", "diffrhythm",
         "wan2.1", "ltx-video", "hunyuan",
-        "piper", "xtts-v2", "fish-speech",
+        "piper", "xtts-v2", "fish-speech", "omnivoice",
         "whisper",
         "musetalk", "latentsync", "liveportrait",
         "rembg", "real-esrgan",

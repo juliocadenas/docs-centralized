@@ -12,7 +12,7 @@ from typing import Optional
 
 from ..models.schemas import SpeechRequest, TranscriptionResponse
 
-from ..config import PIPER_TTS_URL, XTTS_V2_URL, FISH_SPEECH_URL, WHISPER_STT_URL
+from ..config import PIPER_TTS_URL, XTTS_V2_URL, FISH_SPEECH_URL, WHISPER_STT_URL, OMNIVOICE_URL
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -35,6 +35,8 @@ async def create_speech(request: SpeechRequest):
         return await _tts_xtts(request)
     elif model in ("fish", "fish-speech"):
         return await _tts_fish(request)
+    elif model in ("omnivoice", "omni", "cosyvoice", "gpt-sovits", "voxcpm", "moss-tts"):
+        return await _tts_omnivoice(request)
     else:
         # Default: Piper TTS
         return await _tts_piper(request)
@@ -110,6 +112,44 @@ async def _tts_xtts(request: SpeechRequest):
         return await _tts_piper(request)
 
 
+async def _tts_omnivoice(request: SpeechRequest):
+    """
+    OmniVoice Studio - 11 TTS engines, 646 languages, voice cloning.
+    Best quality multilingual TTS. Includes: OmniVoice, Coqui, GPT-SoVITS, CosyVoice.
+    """
+    try:
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            payload = {
+                "text": request.input,
+                "language": request.language or "es",
+                "voice": request.voice or "default",
+                "engine": (request.model or "omnivoice"),
+            }
+            resp = await client.post(
+                f"{OMNIVOICE_URL}/api/tts",
+                json=payload,
+            )
+            if resp.status_code != 200:
+                logger.warning(f"OmniVoice error {resp.status_code}, falling back to Piper")
+                return await _tts_piper(request)
+
+            audio_data = resp.content
+            media_type = "audio/wav"
+            if request.response_format == "mp3":
+                media_type = "audio/mpeg"
+
+            return Response(content=audio_data, media_type=media_type)
+
+    except httpx.ConnectError:
+        logger.warning("OmniVoice not available, falling back to Piper TTS")
+        return await _tts_piper(request)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"OmniVoice error: {e}, falling back to Piper")
+        return await _tts_piper(request)
+
+
 async def _tts_fish(request: SpeechRequest):
     """
     Fish Speech - natural sounding TTS alternative.
@@ -151,7 +191,7 @@ async def list_voices():
     """
     List available TTS voices across all engines.
     """
-    voices = {"piper": [], "xtts": [], "fish": []}
+    voices = {"piper": [], "xtts": [], "fish": [], "omnivoice": []}
 
     async with httpx.AsyncClient(timeout=5.0) as client:
         # Piper voices
@@ -178,8 +218,16 @@ async def list_voices():
         except Exception:
             pass
 
+        # OmniVoice voices (when available)
+        try:
+            resp = await client.get(f"{OMNIVOICE_URL}/api/voices")
+            if resp.status_code == 200:
+                voices["omnivoice"] = resp.json().get("voices", [])
+        except Exception:
+            pass
+
     return {
-        "engines": ["piper", "xtts", "fish"],
+        "engines": ["piper", "xtts", "fish", "omnivoice"],
         "voices": voices,
     }
 

@@ -13,7 +13,7 @@ from typing import Optional
 GATEWAY_HOST = os.getenv("GATEWAY_HOST", "0.0.0.0")
 GATEWAY_PORT = int(os.getenv("GATEWAY_PORT", "9000"))
 GATEWAY_TITLE = "AI Hub Madrid - Gateway API"
-GATEWAY_VERSION = "2.1.0"  # +embeddings, +vision, +warm_model, +multimodal
+GATEWAY_VERSION = "2.3.0"  # +agentic_video, +openmontage, +remotion
 API_V1_PREFIX = "/v1"
 
 # ============================================================
@@ -34,6 +34,8 @@ HALLO2_URL = os.getenv("HALLO2_URL", "http://localhost:8070")
 REMBG_URL = os.getenv("REMBG_URL", "http://localhost:8050")
 UPSCALE_URL = os.getenv("UPSCALE_URL", "http://localhost:8051")
 HIGGSFIELD_URL = os.getenv("HIGGSFIELD_URL", "http://localhost:8052")
+OMNIVOICE_URL = os.getenv("OMNIVOICE_URL", "http://localhost:8030")  # OmniVoice Studio (646 lang TTS)
+REMOTION_URL = os.getenv("REMOTION_URL", "http://localhost:8601")  # Remotion Render Server
 
 # ============================================================
 # Service Definitions
@@ -203,6 +205,28 @@ SERVICES = {
         "vram_mb": 2000,
         "always_on": False,
         "categories": ["effects", "video"],
+    },
+    "omnivoice": {
+        "name": "OmniVoice Studio (646 lang)",
+        "base_url": OMNIVOICE_URL,
+        "port": 8030,
+        "type": "tts",
+        "health_endpoint": "/health",
+        "docker_compose": True,
+        "vram_mb": 4096,
+        "always_on": False,
+        "categories": ["tts", "voice", "stt", "dubbing"],
+    },
+    "remotion": {
+        "name": "Remotion Render Server",
+        "base_url": REMOTION_URL,
+        "port": 8601,
+        "type": "video",
+        "health_endpoint": "/",
+        "systemd_service": "remotion-render",
+        "vram_mb": 0,  # CPU-only (Chromium + FFmpeg)
+        "always_on": False,
+        "categories": ["video", "rendering"],
     },
 }
 

@@ -1,0 +1,135 @@
+#!/bin/bash
+# ============================================================
+# SDXL Turbo + FLUX Schnell - Fast Image Generation for ComfyUI
+# Z-Image-Turbo: Genera imágenes en 1-4 pasos (vs 20-30 normal)
+# ============================================================
+
+set -e
+
+echo "============================================="
+echo "  Z-Image-Turbo (SDXL Turbo + FLUX Schnell)"
+echo "  Ultra-fast image generation: 1-4 steps"
+echo "============================================="
+echo ""
+
+# Directorios de ComfyUI
+COMFYUI_MODELS="/mnt/seagate/models/comfyui/models"
+COMFYUI_CHECKPOINTS="$COMFYUI_MODELS/checkpoints"
+COMFYUI_UNET="$COMFYUI_MODELS/unet"
+COMFYUI_VAE="$COMFYUI_MODELS/vae"
+COMFYUI_CLIP="$COMFYUI_MODELS/clip"
+
+mkdir -p "$COMFYUI_CHECKPOINTS" "$COMFYUI_UNET" "$COMFYUI_VAE" "$COMFYUI_CLIP"
+
+# ============================================================
+# 1. SDXL TURBO (1-step generation, ~7GB)
+# ============================================================
+echo "[1/4] Downloading SDXL Turbo..."
+SDXL_TURBO="$COMFYUI_CHECKPOINTS/sd_xl_turbo_1.0.safetensors"
+
+if [ -f "$SDXL_TURBO" ]; then
+    echo "  ✅ SDXL Turbo already exists ($(du -h "$SDXL_TURBO" | cut -f1))"
+else
+    echo "  Downloading SDXL Turbo (~7GB)..."
+    wget -q --show-progress -O "$SDXL_TURBO" \
+        "https://huggingface.co/stabilityai/sdxl-turbo/resolve/main/sd_xl_turbo_1.0.safetensors" || \
+    echo "  ⚠️  Download failed, try manual: huggingface.co/stabilityai/sdxl-turbo"
+fi
+
+# ============================================================
+# 2. FLUX.1 SCHNELL (4-step, ~12GB, better quality)
+# ============================================================
+echo ""
+echo "[2/4] Downloading FLUX.1 Schnell..."
+FLUX_SCHNELL="$COMFYUI_UNET/flux1-schnell.safetensors"
+
+if [ -f "$FLUX_SCHNELL" ]; then
+    echo "  ✅ FLUX Schnell already exists ($(du -h "$FLUX_SCHNELL" | cut -f1))"
+else
+    echo "  Downloading FLUX.1 Schnell (~12GB)..."
+    # FLUX requiere aceptar la licencia en HuggingFace
+    # Usar el mirror si HF falla
+    wget -q --show-progress -O "$FLUX_SCHNELL" \
+        "https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/flux1-schnell.safetensors" || \
+    echo "  ⚠️  Download failed (may need HF token)"
+    echo "  Manual: huggingface.co/black-forest-labs/FLUX.1-schnell"
+fi
+
+# FLUX necesita su propio VAE
+echo "  Downloading FLUX VAE..."
+FLUX_VAE="$COMFYUI_VAE/ae.safetensors"
+if [ ! -f "$FLUX_VAE" ]; then
+    wget -q --show-progress -O "$FLUX_VAE" \
+        "https://huggingface.co/black-forest-labs/FLUX.1-schnell/resolve/main/ae.safetensors" || true
+fi
+
+# FLUX necesita clip models
+echo "  Downloading FLUX clip..."
+CLIP_L="$COMFYUI_CLIP/clip_l.safetensors"
+T5XXL="$COMFYUI_CLIP/t5xxl_fp8_e4m3fn.safetensors"
+if [ ! -f "$CLIP_L" ]; then
+    wget -q --show-progress -O "$CLIP_L" \
+        "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/clip_l.safetensors" || true
+fi
+if [ ! -f "$T5XXL" ]; then
+    wget -q --show-progress -O "$T5XXL" \
+        "https://huggingface.co/comfyanonymous/flux_text_encoders/resolve/main/t5xxl_fp8_e4m3fn.safetensors" || true
+fi
+
+# ============================================================
+# 3. LCM-LoRA (para SDXL normal también vaya turbo)
+# ============================================================
+echo ""
+echo "[3/4] Downloading LCM-LoRA (turbo boost for any SDXL)..."
+LCM_LORA="$COMFYUI_MODELS/loras/lcm-lora-sdxl.safetensors"
+mkdir -p "$COMFYUI_MODELS/loras"
+if [ ! -f "$LCM_LORA" ]; then
+    wget -q --show-progress -O "$LCM_LORA" \
+        "https://huggingface.co/latent-consistency/lcm-lora-sdxl/resolve/main/pytorch_lora_weights.safetensors" || true
+fi
+
+# ============================================================
+# 4. Crear symlinks si ComfyUI está en otra ruta
+# ============================================================
+echo ""
+echo "[4/4] Creating symlinks..."
+
+# Detectar ruta de instalación de ComfyUI
+COMFYUI_ROOT=$(find /mnt/seagate -name "main.py" -path "*/ComfyUI/*" 2>/dev/null | head -1 | xargs dirname 2>/dev/null || echo "")
+if [ -z "$COMFYUI_ROOT" ]; then
+    COMFYUI_ROOT=$(find /opt -name "main.py" -path "*/ComfyUI/*" 2>/dev/null | head -1 | xargs dirname 2>/dev/null || echo "")
+fi
+if [ -z "$COMFYUI_ROOT" ]; then
+    COMFYUI_ROOT=$(find /root -name "main.py" -path "*/ComfyUI/*" 2>/dev/null | head -1 | xargs dirname 2>/dev/null || echo "")
+fi
+
+if [ -n "$COMFYUI_ROOT" ]; then
+    echo "  ComfyUI found at: $COMFYUI_ROOT"
+    # Crear symlinks
+    ln -sf "$SDXL_TURBO" "$COMFYUI_ROOT/models/checkpoints/" 2>/dev/null || true
+    ln -sf "$FLUX_SCHNELL" "$COMFYUI_ROOT/models/unet/" 2>/dev/null || true
+    ln -sf "$FLUX_VAE" "$COMFYUI_ROOT/models/vae/" 2>/dev/null || true
+    ln -sf "$CLIP_L" "$COMFYUI_ROOT/models/clip/" 2>/dev/null || true
+    ln -sf "$T5XXL" "$COMFYUI_ROOT/models/clip/" 2>/dev/null || true
+    ln -sf "$LCM_LORA" "$COMFYUI_ROOT/models/loras/" 2>/dev/null || true
+    echo "  ✅ Symlinks created"
+else
+    echo "  ⚠️  ComfyUI not found, models are in $COMFYUI_MODELS"
+    echo "     Create symlinks manually if needed"
+fi
+
+echo ""
+echo "============================================="
+echo "  Z-Image-Turbo Downloaded!"
+echo "============================================="
+echo ""
+echo "Models installed:"
+echo "  ⚡ SDXL Turbo:     1-step generation (instant, ~7GB)"
+echo "  🎨 FLUX.1 Schnell: 4-step generation (best quality, ~12GB)"
+echo "  🔧 LCM-LoRA:       Turbo boost for any SDXL model"
+echo ""
+echo "Usage via Gateway:"
+echo "  POST /v1/images/generations"
+echo '  Body: {"model":"sdxl-turbo","prompt":"...","steps":1}'
+echo '  Body: {"model":"flux-schnell","prompt":"...","steps":4}'
+echo ""

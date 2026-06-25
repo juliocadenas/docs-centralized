@@ -1,0 +1,35 @@
+services:
+  moneyprinterturbo:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: moneyprinterturbo
+    ports:
+      - "8501:8501"   # Streamlit UI
+      - "8002:8000"   # API
+    volumes:
+      - ./config.example.toml:/app/config.toml
+      - /mnt/seagate/storage/moneyprinterturbo:/storage
+      - ./projects:/app/projects
+    environment:
+      # Usar servicios LOCALES del AI Hub (zero tokens)
+      - OLLAMA_API_URL=http://host.docker.internal:11434
+      - PIPER_TTS_URL=http://host.docker.internal:8010
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-sf", "http://localhost:8501/_stcore/health"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    # GPU access (necesaria para TTS/STT local)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    profiles: ["content"]

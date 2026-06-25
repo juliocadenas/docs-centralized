@@ -68,8 +68,22 @@ class ComfyUIService:
             checkpoint_map = {
                 "sd15": "v1-5-pruned-emaonly.safetensors",
                 "sdxl": "sd_xl_base_1.0.safetensors",
+                "sdxl-turbo": "sd_xl_turbo_1.0.safetensors",
+                "flux-schnell": "flux1-schnell.safetensors",
             }
             checkpoint = checkpoint_map.get(model, model)
+
+            # Override steps for turbo models if not specified
+            if model == "sdxl-turbo" and steps == 20:
+                steps = 1  # SDXL Turbo default: 1 step
+            elif model == "flux-schnell" and steps == 20:
+                steps = 4  # FLUX Schnell default: 4 steps
+
+            # Turbo models don't use negative prompts or high CFG
+            if model == "sdxl-turbo":
+                cfg_scale = min(cfg_scale, 1.0)  # SDXL Turbo needs CFG <= 1.0
+            elif model == "flux-schnell":
+                cfg_scale = 0.0  # FLUX schnell needs CFG = 0
 
             if seed == -1:
                 import random
