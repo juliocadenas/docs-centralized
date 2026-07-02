@@ -1,12 +1,12 @@
 #!/bin/bash
 # ============================================================
-#  🔧 DEPLOY RÁPIDO - Fix generación de video Wan2GP
-#  Usa HTTP Gradio 5.x API directo (sin gradio_client)
+#  🔧 DEPLOY RÁPIDO - Fix generación de video Wan2GP v2
+#  Usa gradio_client via subprocess (maneja sesiones Gradio 5.x)
 #  Ejecutar en el NAB9: sudo bash DEPLOY_VIDEO_FIX.sh
 # ============================================================
 set -e
 
-echo "🔧 Deploy fix video Wan2GP (HTTP Gradio API)..."
+echo "🔧 Deploy fix video Wan2GP v2 (gradio_client subprocess)..."
 
 # Encontrar repo y gateway
 REPO_PATH=$(find /mnt/seagate/repos /home -maxdepth 3 -name "IA-HUB-MADRID1" -type d 2>/dev/null | head -1)
@@ -24,9 +24,17 @@ git fetch origin 2>/dev/null || true
 git reset --hard origin/main 2>/dev/null || git pull origin main 2>/dev/null
 echo "✅ Código actualizado"
 
-# Copiar solo el archivo cambiado (wan2gp.py usa httpx puro, no necesita nuevas deps)
+# Instalar gradio_client si no está
+if ! python3 -c "import gradio_client" 2>/dev/null; then
+    echo "📦 Instalando gradio_client..."
+    pip3 install gradio_client>=1.0.0 2>&1 | tail -3
+fi
+echo "✅ gradio_client verificado"
+
+# Copiar archivos cambiados
 cp "$REPO_PATH/ai-hub-gateway/gateway/services/wan2gp.py" "$GATEWAY_PATH/gateway/services/wan2gp.py"
-echo "✅ wan2gp.py copiado"
+cp "$REPO_PATH/ai-hub-gateway/gateway/services/wan2gp_generator.py" "$GATEWAY_PATH/gateway/services/wan2gp_generator.py"
+echo "✅ wan2gp.py + wan2gp_generator.py copiados"
 
 # Reiniciar gateway
 systemctl restart ai-hub-gateway
@@ -37,9 +45,9 @@ if systemctl is-active --quiet ai-hub-gateway; then
     echo ""
     echo "🧪 Probando video generation..."
     # Test que el endpoint responde
-    STATUS=$(curl -s --max-time 10 http://localhost:9000/v1/video/generations \
+    STATUS=$(curl -s --max-time 30 http://localhost:9000/v1/video/generations \
         -X POST -H "Content-Type: application/json" \
-        -d '{"prompt":"test","model":"wan2.1","resolution":"480p","duration_seconds":3}' \
+        -d '{"prompt":"a flying panda","model":"wan2.1","resolution":"480p","duration_seconds":3}' \
         | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('status','error'))" 2>/dev/null || echo "timeout")
     echo "  Video endpoint status: $STATUS"
     echo ""

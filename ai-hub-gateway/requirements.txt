@@ -9,3 +9,4 @@ pyyaml>=6.0               # For model_registry.yaml
 aiofiles>=23.0            # For async file serving
 chromadb>=0.4.22          # Vector DB for RAG (knowledge base)
 PyMuPDF>=1.24.0           # PDF text extraction for RAG
+gradio_client>=1.0.0      # For Wan2GP video generation (Gradio 5.x sessions)
