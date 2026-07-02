@@ -124,6 +124,9 @@ class VideoGenerationRequest(BaseModel):
     seed: Optional[int] = -1
     sampler: Optional[str] = None
     scheduler: Optional[str] = None
+    # Frontend compatibility fields (AI Hub Studio sends these)
+    duration_seconds: Optional[int] = None
+    resolution: Optional[str] = None
 
 
 class VideoGenerationResponse(BaseModel):

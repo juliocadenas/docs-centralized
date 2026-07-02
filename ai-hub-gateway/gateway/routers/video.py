@@ -50,9 +50,28 @@ async def create_video(request: VideoGenerationRequest):
     
     Supports models: wan2.1, ltx-video, hunyuan.
     Configurable resolution, frames, steps, and sampling parameters.
+    
+    Also accepts 'duration_seconds' and 'resolution' for frontend compatibility:
+    - duration_seconds (3-10s) → converted to frames (at ~16fps for wan2.1)
+    - resolution ('480p', '720p') → converted to width/height
     """
     if not wan2gp_service:
         raise HTTPException(status_code=503, detail="Video service not initialized")
+
+    # ── Convert frontend params to Wan2GP params ──
+    # duration_seconds (3-10s) → frames at ~16fps for wan2.1 1.3B
+    if request.duration_seconds and not request.frames:
+        # wan2.1 at 16fps: 3s≈49 frames, 5s≈81, 8s≈129, 10s≈161
+        request.frames = max(41, request.duration_seconds * 16 + 1)
+        # Ensure odd number (some models prefer odd frame counts)
+        if request.frames % 2 == 0:
+            request.frames += 1
+
+    # resolution string → width/height
+    if request.resolution:
+        res_map = {"480p": (832, 480), "720p": (1280, 720), "1080p": (1920, 1080)}
+        if request.resolution in res_map:
+            request.width, request.height = res_map[request.resolution]
 
     # Ensure service is running and mark as used
     gpu_acquired = False
@@ -67,20 +86,23 @@ async def create_video(request: VideoGenerationRequest):
             logger.error(f"Failed to acquire GPU for video: {e}")
             raise HTTPException(status_code=503, detail=f"GPU unavailable: {str(e)}")
 
+    # Build generation params with sensible defaults
+    gen_kwargs = dict(
+        prompt=request.prompt,
+        negative_prompt=request.negative_prompt or "",
+        model=request.model or "wan2.1",
+        width=request.width or 832,
+        height=request.height or 480,
+        frames=request.frames or 81,
+        steps=request.steps or 20,
+        cfg_scale=request.cfg_scale or 6.0,
+        seed=request.seed or -1,
+        sampler=request.sampler,
+        scheduler=request.scheduler,
+    )
+
     try:
-        result = await wan2gp_service.generate_video(
-            prompt=request.prompt,
-            negative_prompt=request.negative_prompt or "",
-            model=request.model or "wan2.1",
-            width=request.width or 832,
-            height=request.height or 480,
-            frames=request.frames or 81,
-            steps=request.steps or 20,
-            cfg_scale=request.cfg_scale or 6.0,
-            seed=request.seed or -1,
-            sampler=request.sampler,
-            scheduler=request.scheduler,
-        )
+        result = await wan2gp_service.generate_video(**gen_kwargs)
     except httpx.TimeoutException:
         logger.error("Wan2GP timeout generating video")
         raise HTTPException(status_code=504, detail="Video generation timed out. Try fewer frames or steps.")
