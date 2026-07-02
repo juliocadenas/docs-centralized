@@ -1,14 +1,18 @@
-
 """
 Wan2GP Service Connector.
-Uses gradio_client to interface with Wan2GP's complex Gradio 5.x API.
-The Gateway runs locally on the NAB9, so gradio_client connects to localhost.
+Interfaces with Wan2GP v11.84 (Gradio 5.29.0) via HTTP Gradio API.
+
+Flow:
+1. fill_wizard_prompt - sets the prompt
+2. process_prompt_and_add_tasks - adds to generation queue
+3. prepare_generate_video - starts generation
+4. Poll _refresh_gallery for output video URL
 """
 import logging
 import time
 import asyncio
-import os
-from typing import Dict, Optional
+import json
+from typing import Dict, Optional, List
 
 import httpx
 
@@ -16,60 +20,119 @@ from ..config import WAN2GP_BASE_URL
 
 logger = logging.getLogger(__name__)
 
-# Check if gradio_client is available
-try:
-    from gradio_client import Client as GradioClient
-    GRADIO_CLIENT_AVAILABLE = True
-except ImportError:
-    GRADIO_CLIENT_AVAILABLE = False
-    logger.warning("gradio_client not installed. Video generation will use redirect mode.")
+# Gradio 5.x API base for calls
+GRADIO_CALL_PREFIX = "/gradio_api/call"
 
 
 class Wan2GPService:
-    """Service connector for Wan2GP video generation via Gradio Client."""
+    """Service connector for Wan2GP video generation via Gradio 5.x HTTP API."""
 
     def __init__(self, base_url: str = WAN2GP_BASE_URL):
         self.base_url = base_url.rstrip("/")
-        self.client = httpx.AsyncClient(timeout=10.0)
-        self._gradio_client = None
-        self._gradio_lock = asyncio.Lock()
+        # Short timeout client for API calls
+        self.client = httpx.AsyncClient(timeout=30.0)
 
     async def health_check(self) -> Dict:
         """Check if Wan2GP is running."""
         try:
             start = time.time()
-            resp = await self.client.get(f"{self.base_url}/", timeout=10.0)
+            resp = await self.client.get(f"{self.base_url}/config", timeout=10.0)
             elapsed = (time.time() - start) * 1000
             if resp.status_code == 200:
-                return {"status": "online", "response_time_ms": elapsed}
+                # Check version
+                data = resp.json()
+                version = data.get("version", "unknown")
+                return {
+                    "status": "online",
+                    "response_time_ms": elapsed,
+                    "version": version,
+                }
             return {"status": "error", "error": f"HTTP {resp.status_code}"}
         except httpx.ConnectError:
             return {"status": "offline", "error": "Connection refused"}
         except Exception as e:
             return {"status": "error", "error": str(e)}
 
-    async def _get_gradio_client(self) -> Optional["GradioClient"]:
-        """Get or create a gradio_client connection (thread-safe)."""
-        if not GRADIO_CLIENT_AVAILABLE:
+    async def _call_gradio_endpoint(
+        self,
+        endpoint: str,
+        data: list,
+        timeout: float = 30.0,
+    ) -> Optional[tuple]:
+        """
+        Call a Gradio 5.x API endpoint and get result via SSE.
+
+        Returns (event_id, result_data) tuple or None on failure.
+        """
+        url = f"{self.base_url}{GRADIO_CALL_PREFIX}/{endpoint.lstrip('/')}"
+
+        try:
+            # Step 1: Submit the call
+            resp = await self.client.post(
+                url,
+                json={"data": data},
+                timeout=timeout,
+            )
+
+            if resp.status_code != 200:
+                logger.error(
+                    f"Gradio call {endpoint} returned {resp.status_code}: {resp.text[:200]}"
+                )
+                return None
+
+            event_data = resp.json()
+            event_id = event_data.get("event_id")
+            if not event_id:
+                logger.error(f"No event_id from {endpoint}: {event_data}")
+                return None
+
+            logger.debug(f"{endpoint} submitted, event_id={event_id}")
+
+            # Step 2: Get result via SSE
+            sse_url = f"{url}/{event_id}"
+            result = await self._read_sse(sse_url, timeout=timeout)
+
+            return (event_id, result)
+
+        except httpx.TimeoutException:
+            logger.warning(f"{endpoint} timed out")
+            return None
+        except Exception as e:
+            logger.error(f"{endpoint} failed: {e}")
             return None
 
-        async with self._gradio_lock:
-            if self._gradio_client is None:
-                try:
-                    # Connect in a thread (gradio_client is sync)
-                    self._gradio_client = await asyncio.to_thread(
-                        GradioClient, self.base_url
-                    )
-                    logger.info(f"Gradio client connected to {self.base_url}")
-                except Exception as e:
-                    logger.error(f"Failed to connect gradio_client: {e}")
-                    self._gradio_client = None
-            return self._gradio_client
+    async def _read_sse(self, url: str, timeout: float = 30.0) -> Optional[list]:
+        """Read SSE stream from Gradio result endpoint."""
+        try:
+            async with self.client.stream("GET", url, timeout=timeout) as resp:
+                if resp.status_code != 200:
+                    logger.warning(f"SSE returned {resp.status_code}")
+                    return None
 
-    async def _reset_gradio_client(self):
-        """Reset the gradio client (on error)."""
-        async with self._gradio_lock:
-            self._gradio_client = None
+                event_type = None
+                async for line in resp.aiter_lines():
+                    line = line.strip()
+
+                    if line.startswith("event:"):
+                        event_type = line[6:].strip()
+                    elif line.startswith("data:") and event_type:
+                        data_str = line[5:].strip()
+                        try:
+                            data = json.loads(data_str)
+                        except json.JSONDecodeError:
+                            continue
+
+                        if event_type == "complete":
+                            return data
+                        elif event_type == "error":
+                            logger.error(f"Gradio SSE error: {data}")
+                            return None
+        except httpx.TimeoutException:
+            logger.warning(f"SSE read timed out for {url}")
+        except Exception as e:
+            logger.error(f"SSE read failed: {e}")
+
+        return None
 
     async def generate_video(
         self,
@@ -87,123 +150,76 @@ class Wan2GPService:
     ) -> Dict:
         """
         Generate video via Wan2GP.
-        
-        Uses gradio_client to interface with the complex Gradio 5.x API.
-        Wan2GP's UI has 488 functions with deep UI state dependencies,
-        so we use gradio_client which handles session management.
-        
-        Falls back to redirect mode if gradio_client is unavailable.
+
+        Uses Gradio 5.x HTTP API with the correct endpoint sequence.
         """
         if seed == -1:
             import random
             seed = random.randint(0, 2**32 - 1)
 
-        # ── STRATEGY 1: Use gradio_client (best for this complex API) ──
-        if GRADIO_CLIENT_AVAILABLE:
-            try:
-                result = await self._generate_via_gradio_client(
-                    prompt=prompt,
-                    model=model,
-                    width=width,
-                    height=height,
-                    frames=frames,
-                    steps=steps,
-                    cfg_scale=cfg_scale,
-                    seed=seed,
-                )
-                if result and "error" not in result:
-                    return result
-                if result:
-                    logger.warning(f"gradio_client returned error: {result.get('error')}")
-            except Exception as e:
-                logger.error(f"gradio_client generation failed: {e}")
-                await self._reset_gradio_client()
+        # Check service health
+        health = await self.health_check()
+        if health.get("status") != "online":
+            return {
+                "error": f"Wan2GP is {health.get('status')}: {health.get('error', '')}",
+                "webui_url": self.base_url,
+            }
 
-        # ── STRATEGY 2: Try raw HTTP (Gradio 5.x SSE format) ──
-        try:
-            result = await self._generate_via_http(prompt, model, seed)
-            if result and "error" not in result:
-                return result
-        except Exception as e:
-            logger.error(f"HTTP generation failed: {e}")
+        logger.info(f"Wan2GP: Starting generation for '{prompt[:60]}...'")
 
-        # ── FALLBACK: Redirect to web UI ──
-        logger.warning("All generation strategies failed, returning redirect")
-        return {
-            "id": f"video-{int(time.time())}",
-            "status": "redirect",
-            "model": model,
-            "seed": seed,
-            "message": "Wan2GP video generation requires the web UI for this configuration.",
-            "webui_url": self.base_url,
-            "prompt": prompt,
-        }
+        # ── STEP 1: fill_wizard_prompt ──
+        # Params: [wizard_prompt_activated, ???, wizard_prompt]
+        logger.info("Wan2GP [1/3]: Setting prompt via fill_wizard_prompt...")
+        result = await self._call_gradio_endpoint(
+            "/fill_wizard_prompt",
+            ["on", "", prompt],
+            timeout=30.0,
+        )
+        if result is None:
+            logger.warning("fill_wizard_prompt failed, trying to continue anyway")
 
-    async def _generate_via_gradio_client(
-        self,
-        prompt: str,
-        model: str = "wan2.1",
-        width: int = 832,
-        height: int = 480,
-        frames: int = 81,
-        steps: int = 20,
-        cfg_scale: float = 6.0,
-        seed: int = -1,
-    ) -> Dict:
-        """
-        Generate video using gradio_client.
-        
-        Wan2GP flow:
-        1. fill_wizard_prompt - sets the prompt in the UI
-        2. process_prompt_and_add_tasks - adds to generation queue
-        3. prepare_generate_video - starts the generation
-        4. Poll refresh_gallery for output video
-        """
-        client = await self._get_gradio_client()
-        if not client:
-            return {"error": "gradio_client not connected"}
+        # ── STEP 2: process_prompt_and_add_tasks ──
+        # Params: [wizard_prompt_activated_var, wizard_variables_names, wizard_prompt]
+        logger.info("Wan2GP [2/3]: Adding task via process_prompt_and_add_tasks...")
+        result = await self._call_gradio_endpoint(
+            "/process_prompt_and_add_tasks",
+            ["on", "", prompt],
+            timeout=30.0,
+        )
+        if result is None:
+            logger.error("process_prompt_and_add_tasks failed")
+            return {
+                "error": "Failed to add video task to Wan2GP queue",
+                "webui_url": self.base_url,
+            }
 
-        # Step 1: Fill the prompt
-        logger.info(f"Wan2GP: Setting prompt '{prompt[:50]}...'")
-        try:
-            await asyncio.to_thread(
-                client.predict,
-                "",  # variables
-                prompt,  # the prompt text
-                "",  # additional context
-                "",  # extra
-                api_name="/fill_wizard_prompt",
-            )
-        except Exception as e:
-            logger.warning(f"fill_wizard_prompt failed (may be ok): {e}")
+        # ── STEP 3: prepare_generate_video ──
+        # No params
+        logger.info("Wan2GP [3/3]: Starting generation via prepare_generate_video...")
+        result = await self._call_gradio_endpoint(
+            "/prepare_generate_video",
+            [],
+            timeout=60.0,
+        )
 
-        # Step 2: Add task to queue
-        logger.info("Wan2GP: Adding task to queue...")
-        try:
-            await asyncio.to_thread(
-                client.predict,
-                0,       # current_gallery_tab
-                prompt,  # prompt text
-                "",      # extra state
-                api_name="/process_prompt_and_add_tasks",
-            )
-        except Exception as e:
-            logger.warning(f"process_prompt_and_add_tasks failed: {e}")
+        # ── STEP 4: Poll gallery for output video ──
+        logger.info("Wan2GP: Generation started, polling gallery for output...")
+        video_url = await self._poll_gallery_for_video(timeout=600)
 
-        # Step 3: Start generation
-        logger.info("Wan2GP: Starting generation...")
-        try:
-            await asyncio.to_thread(
-                client.predict,
-                api_name="/prepare_generate_video",
-            )
-        except Exception as e:
-            logger.warning(f"prepare_generate_video failed: {e}")
+        if video_url:
+            logger.info(f"Wan2GP: Video ready at {video_url}")
+            return {
+                "id": f"video-{int(time.time())}",
+                "created": int(time.time()),
+                "model": model,
+                "video_url": video_url,
+                "url": video_url,
+                "status": "completed",
+                "seed": seed,
+            }
 
-        # Step 4: Poll gallery for output video
-        logger.info("Wan2GP: Waiting for video output (polling gallery)...")
-        video_url = await self._poll_gradio_gallery(client, timeout=600)
-
+        # Fallback: Check if Wan2GP has output files directly
+        video_url = await self._check_output_directory()
         if video_url:
             return {
                 "id": f"video-{int(time.time())}",
@@ -215,176 +231,114 @@ class Wan2GPService:
                 "seed": seed,
             }
 
-        return {"error": "Video generation timed out waiting for output"}
+        logger.warning("Wan2GP: Could not retrieve video URL")
+        return {
+            "error": "Video generation started but URL not found. Check Wan2GP web UI.",
+            "webui_url": self.base_url,
+        }
 
-    async def _poll_gradio_gallery(
+    async def _poll_gallery_for_video(
         self,
-        client: "GradioClient",
         timeout: int = 600,
+        poll_interval: int = 10,
     ) -> Optional[str]:
         """
-        Poll the Wan2GP gallery for generated videos.
-        
-        Wan2GP stores output videos in its gallery. We call refresh_gallery
-        and look for video file URLs.
+        Poll _refresh_gallery for generated videos.
+
+        _refresh_gallery has 3 params: [refresh_id, paths_json, selected_idx]
         """
         start_time = time.time()
-        check_interval = 5  # seconds
+        attempts = 0
 
         while time.time() - start_time < timeout:
-            try:
-                # Call refresh_gallery to get current gallery state
-                result = await asyncio.to_thread(
-                    client.predict,
-                    api_name="/refresh_gallery",
-                )
+            attempts += 1
+            elapsed = int(time.time() - start_time)
+            logger.debug(
+                f"Wan2GP: Gallery poll #{attempts} ({elapsed}s elapsed)"
+            )
 
-                # Parse result for video URLs
-                video_url = self._extract_video_from_gallery(result)
+            # Call _refresh_gallery
+            result = await self._call_gradio_endpoint(
+                "/_refresh_gallery",
+                ["", [], -1],
+                timeout=30.0,
+            )
+
+            if result and isinstance(result, tuple):
+                _, gallery_data = result
+                video_url = self._extract_video_url(gallery_data)
                 if video_url:
-                    logger.info(f"Wan2GP: Video found: {video_url}")
                     return video_url
 
-            except Exception as e:
-                logger.debug(f"Gallery poll error: {e}")
-
-            await asyncio.sleep(check_interval)
+            await asyncio.sleep(poll_interval)
 
         return None
 
-    def _extract_video_from_gallery(self, result) -> Optional[str]:
+    def _extract_video_url(self, data) -> Optional[str]:
         """
-        Extract video URL from Wan2GP gallery response.
-        
-        Gallery response can be:
-        - List of file objects: [{"path": "...", "url": "...", "orig_name": "..."}]
-        - Tuple with gallery data
-        - None (no videos yet)
+        Recursively extract video URL from Gradio gallery response.
+
+        Gallery data can be nested lists/tuples of file objects.
         """
-        if not result:
+        if not data:
             return None
 
-        # Handle tuple (gradio often returns tuples)
-        if isinstance(result, (tuple, list)):
-            for item in result:
-                url = self._extract_video_from_gallery(item)
+        # Handle tuple/list
+        if isinstance(data, (tuple, list)):
+            for item in data:
+                url = self._extract_video_url(item)
                 if url:
                     return url
             return None
 
         # Handle dict (file object)
-        if isinstance(result, dict):
-            # Check for video file
-            orig_name = result.get("orig_name", "")
-            if orig_name.endswith((".mp4", ".webm", ".avi", ".gif", ".mov")):
-                url = result.get("url", "")
+        if isinstance(data, dict):
+            orig_name = data.get("orig_name", "")
+            if orig_name.lower().endswith((".mp4", ".webm", ".avi", ".gif", ".mov")):
+                # Check for URL field
+                url = data.get("url", "")
                 if url:
+                    # Make absolute if needed
+                    if url.startswith("/"):
+                        return f"{self.base_url}{url}"
                     return url
-                path = result.get("path", "")
+
+                # Check for path field (Gradio file serving)
+                path = data.get("path", "")
                 if path:
                     return f"{self.base_url}/gradio_api/file={path}"
 
             # Check nested data
-            for key in ("video", "image", "data"):
-                if key in result:
-                    url = self._extract_video_from_gallery(result[key])
+            for key in ("video", "image", "data", "value"):
+                if key in data:
+                    url = self._extract_video_url(data[key])
                     if url:
                         return url
 
         # Handle string URL
-        if isinstance(result, str):
-            if result.startswith("http") and result.endswith((".mp4", ".webm", ".gif")):
-                return result
+        if isinstance(data, str):
+            if data.lower().endswith((".mp4", ".webm", ".gif", ".mov")):
+                if data.startswith("http"):
+                    return data
+                if data.startswith("/"):
+                    return f"{self.base_url}{data}"
 
         return None
 
-    async def _generate_via_http(self, prompt: str, model: str, seed: int) -> Dict:
+    async def _check_output_directory(self) -> Optional[str]:
         """
-        Try raw HTTP Gradio 5.x API as fallback.
-        Uses /gradio_api/call/ endpoint with SSE polling.
+        Check if Wan2GP has output files in its output directory.
+        This is a fallback when gallery polling fails.
         """
-        long_client = httpx.AsyncClient(timeout=600.0)
-        try:
-            # Submit to /gradio_api/call/generate
-            resp = await long_client.post(
-                f"{self.base_url}/gradio_api/call/generate",
-                json={
-                    "data": [
-                        prompt,     # prompt text
-                        "",         # negative
-                        model,      # model
-                        832,        # width
-                        480,        # height
-                        81,         # frames
-                        20,         # steps
-                        6.0,        # cfg
-                        seed,       # seed
-                    ]
-                },
-                timeout=30.0,
-            )
+        # Wan2GP typically saves to an output folder
+        # Try common paths via the file serving API
+        output_paths = [
+            "/output/",
+            "/gradio_api/file=output/",
+        ]
 
-            if resp.status_code != 200:
-                return {"error": f"HTTP submit returned {resp.status_code}"}
-
-            event_data = resp.json()
-            event_id = event_data.get("event_id")
-            if not event_id:
-                return {"error": "No event_id in response"}
-
-            # Poll SSE for result
-            sse_url = f"{self.base_url}/gradio_api/call/generate/{event_id}"
-            video_url = await self._poll_sse(long_client, sse_url)
-
-            if video_url:
-                return {
-                    "id": f"video-{int(time.time())}",
-                    "created": int(time.time()),
-                    "model": model,
-                    "video_url": video_url,
-                    "url": video_url,
-                    "status": "completed",
-                    "seed": seed,
-                }
-
-            return {"error": "SSE polling timed out"}
-        finally:
-            await long_client.aclose()
-
-    async def _poll_sse(self, client: httpx.AsyncClient, url: str, timeout: int = 600) -> Optional[str]:
-        """Poll SSE endpoint for video result."""
-        start_time = time.time()
-        while time.time() - start_time < timeout:
-            try:
-                async with client.stream("GET", url, timeout=30.0) as resp:
-                    if resp.status_code != 200:
-                        await asyncio.sleep(2)
-                        continue
-
-                    event_type = None
-                    async for line in resp.aiter_lines():
-                        line = line.strip()
-                        if line.startswith("event:"):
-                            event_type = line[6:].strip()
-                        elif line.startswith("data:"):
-                            import json
-                            data_str = line[5:].strip()
-                            try:
-                                data = json.loads(data_str)
-                            except json.JSONDecodeError:
-                                continue
-
-                            if event_type == "complete":
-                                return self._extract_video_from_gallery(data)
-                            elif event_type == "error":
-                                logger.error(f"Gradio SSE error: {data}")
-                                return None
-            except (httpx.ReadTimeout, httpx.ConnectTimeout):
-                continue
-            except Exception as e:
-                logger.debug(f"SSE poll error: {e}")
-                await asyncio.sleep(2)
-
+        # We can't easily list directories via HTTP, so just return None
+        # The gallery polling should handle this
         return None
 
     async def close(self):
